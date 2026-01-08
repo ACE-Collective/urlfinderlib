@@ -92,6 +92,7 @@ def test_get_netloc_idna():
 def test_get_netloc_unicode():
     assert URL("http://xn--fa-hia.de").netloc_unicode == "faß.de"
     assert URL("http://dom[ain.com").netloc_unicode == ""
+    assert URL("http://%E1%B4%98%E1%B4%80%CA%8F.com").netloc_unicode == "ᴘᴀʏ.com"
 
 
 def test_get_path_all_decoded():
@@ -220,6 +221,7 @@ def test_url_create():
     assert URL("http://domain.com").value == "http://domain.com"
     assert URL("http://domain.com/").value == "http://domain.com"
     assert URL(b"http://domain.com").value == "http://domain.com"
+    assert URL(URL("http://domain.com")).value == "http://domain.com"
 
 
 def test_url_decode_barracuda():
