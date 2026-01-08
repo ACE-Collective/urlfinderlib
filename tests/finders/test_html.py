@@ -2,7 +2,6 @@ from lxml import etree
 
 import urlfinderlib.finders as finders
 
-
 html = """
 <html xmlns="xmlns">
     <head>

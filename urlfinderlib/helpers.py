@@ -1,7 +1,7 @@
 import base64
-import validators
-
 from urllib.parse import urlsplit
+
+import validators
 
 
 def build_url(scheme: str, netloc: str, path: str) -> str:

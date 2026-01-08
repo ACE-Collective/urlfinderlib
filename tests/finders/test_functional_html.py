@@ -1,6 +1,5 @@
 import urlfinderlib.finders
 
-
 html = b"""
 <html xmlns="xmlns">
     <head>

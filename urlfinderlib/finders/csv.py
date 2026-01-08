@@ -1,10 +1,10 @@
 import csv
 import io
-
 from typing import Set, Union
 
-from .text import TextUrlFinder
 from urlfinderlib.url import URLList
+
+from .text import TextUrlFinder
 
 
 class CsvUrlFinder:

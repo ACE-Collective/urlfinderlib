@@ -1,19 +1,19 @@
+import html
 import re
 import warnings
-
-import html
 from io import StringIO
 from itertools import chain
-from lxml import etree
 from typing import Set, Union
 from urllib.parse import unquote, urljoin
 
+from lxml import etree
+
 import urlfinderlib.helpers as helpers
 import urlfinderlib.tokenizer as tokenizer
-
-from .text import TextUrlFinder
 from urlfinderlib import is_url
 from urlfinderlib.url import URLList
+
+from .text import TextUrlFinder
 
 warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
 
