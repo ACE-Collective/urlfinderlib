@@ -119,7 +119,9 @@ def test_find_urls_ical():
             "https://thisisjustatest4.com",
         }
 
-        assert urlfinderlib.find_urls(blob) == expected_urls
+        result = urlfinderlib.find_urls(blob)
+
+        assert result == expected_urls
 
 
 def test_find_urls_in_text_like_html():

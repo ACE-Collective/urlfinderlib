@@ -40,7 +40,7 @@ def find_urls(blob: Union[bytes, str], base_url: str = "", mimetype: str = "", d
     elif "html" in mimetype:
         blob = _unescape_ascii(blob)
         urls += finders.HtmlUrlFinder(blob, base_url=base_url).find_urls()
-    elif "vcalendar" in mimetype:
+    elif "vcalendar" in mimetype or "icalendar" in mimetype:
         urls += finders.IcalUrlFinder(blob).find_urls()
     elif "xml" in mimetype:
         urls += finders.XmlUrlFinder(blob).find_urls()
