@@ -1,4 +1,5 @@
 import pytest
+
 from urlfinderlib.tokenizer import UTF8Tokenizer
 
 bytes_0_char = b"Test with 0 chars"

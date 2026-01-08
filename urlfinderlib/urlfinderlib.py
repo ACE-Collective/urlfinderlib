@@ -1,13 +1,12 @@
 import codecs
-import magic
 import re
 import string
-
 from typing import Set, Union
+
+import magic
 
 import urlfinderlib.finders as finders
 import urlfinderlib.helpers as helpers
-
 from urlfinderlib.url import URL, URLList
 
 
@@ -98,22 +97,22 @@ def _unescape_ascii(blob: bytes) -> bytes:
 
     if _has_u_escaped_lowercase_bytes(blob):
         for char in ascii_chars:
-            escaped = f'\\u00{format(ord(char), "x")}'.encode("utf-8")
+            escaped = f"\\u00{format(ord(char), 'x')}".encode("utf-8")
             blob = blob.replace(escaped, escaped.decode("unicode_escape").encode("utf-8"))
 
     if _has_u_escaped_uppercase_bytes(blob):
         for char in ascii_chars:
-            escaped = f'\\u00{format(ord(char), "X")}'.encode("utf-8")
+            escaped = f"\\u00{format(ord(char), 'X')}".encode("utf-8")
             blob = blob.replace(escaped, escaped.decode("unicode_escape").encode("utf-8"))
 
     if _has_x_escaped_lowercase_bytes(blob):
         for char in ascii_chars:
-            escaped = f'\\x{format(ord(char), "x")}'.encode("utf-8")
+            escaped = f"\\x{format(ord(char), 'x')}".encode("utf-8")
             blob = blob.replace(escaped, escaped.decode("unicode_escape").encode("utf-8"))
 
     if _has_x_escaped_uppercase_bytes(blob):
         for char in ascii_chars:
-            escaped = f'\\x{format(ord(char), "X")}'.encode("utf-8")
+            escaped = f"\\x{format(ord(char), 'X')}".encode("utf-8")
             blob = blob.replace(escaped, escaped.decode("unicode_escape").encode("utf-8"))
 
     return blob

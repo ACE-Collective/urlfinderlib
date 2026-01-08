@@ -24,12 +24,14 @@ valid_urls = [
     "http://xn--d5b6ci4b4b3a.xn--54b7fta0cc",
     "http://domain.com/&lt;",
     b"http://domain.com",
+    "http://%E1%B4%98%E1%B4%80%CA%8F%E1%B4%8D%E1%B4%87%C9%B4%E1%B4%9B%E1%B4%85%E1%B4%87%E1%B4%84%CA%9F%C9%AA%C9%B4%E1%B4%87%E1%B4%85-domain.com/index.php",
 ]
 
 invalid_urls = [
     "user@domain.com",
     "domain.com",
-    "domain.com/index.html" "http:/domain.com",
+    "domain.com/index.html",
+    "http:/domain.com",
     "http:/\\domain.com",
     "http://domain.com\\index.html",
     "http://domain.invalidtld",
@@ -90,6 +92,7 @@ def test_get_netloc_idna():
 def test_get_netloc_unicode():
     assert URL("http://xn--fa-hia.de").netloc_unicode == "faß.de"
     assert URL("http://dom[ain.com").netloc_unicode == ""
+    assert URL("http://%E1%B4%98%E1%B4%80%CA%8F.com").netloc_unicode == "ᴘᴀʏ.com"
 
 
 def test_get_path_all_decoded():
@@ -218,6 +221,7 @@ def test_url_create():
     assert URL("http://domain.com").value == "http://domain.com"
     assert URL("http://domain.com/").value == "http://domain.com"
     assert URL(b"http://domain.com").value == "http://domain.com"
+    assert URL(URL("http://domain.com")).value == "http://domain.com"
 
 
 def test_url_decode_barracuda():
@@ -296,7 +300,10 @@ def test_url_decode_proofpoint_v3():
         "https://urldefense.com/v3/__https://link.edgepilot.com/s/822cebfe/5ZxIVsowtUueiP3V0OatBg?u=https:**Ago.microsoft.com*fwlink**ALinkid=844050__;Ly8vLz8!!NAqySMJg!B2KGwyFP3G5bqSRMBCEyMq9ccomB-Bybhf53qbl7ZlsYnJ3UKkAO0beFX-yj1V-raXJsLn3FHZlSQTjIvxO4_2Y$"
     )
     assert url.is_proofpoint_v3 is True
-    assert url.child_urls == ["https://link.edgepilot.com/s/822cebfe/5ZxIVsowtUueiP3V0OatBg?u=https://go.microsoft.com/fwlink/?Linkid=844050"]
+    assert url.child_urls == [
+        "https://link.edgepilot.com/s/822cebfe/5ZxIVsowtUueiP3V0OatBg?u=https://go.microsoft.com/fwlink/?Linkid=844050"
+    ]
+
 
 def test_url_get_fragment_values():
     url = URL("https://domain.com/index.php#a=1&b=2&c=3")
@@ -399,7 +406,7 @@ def test_urllist_append():
     urllist = URLList()
     urllist.append("http://domain.com")
     urllist.append("domain")
-    urllist.append("http://d😉o😉m😉a😉i😉n😉2😉.😉c😉o😉m"),
+    urllist.append("http://d😉o😉m😉a😉i😉n😉2😉.😉c😉o😉m")
     urllist.append("email@domain3.com")
     assert urllist == ["http://domain.com", "http://domain2.com"]
 

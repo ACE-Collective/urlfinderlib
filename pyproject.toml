@@ -38,6 +38,7 @@ urlfinder = "urlfinderlib.__main__:main"
 dev = [
     "pytest",
     "pytest-cov",
+    "ruff",
 ]
 
 [build-system]
@@ -47,8 +48,14 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-root = ""
 
-[tool.black]
+[tool.ruff]
 line-length = 120
+
+[tool.ruff.lint]
+select = ["I"]  # Enable isort rules for import sorting
+
+[tool.ruff.format]
+quote-style = "double"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

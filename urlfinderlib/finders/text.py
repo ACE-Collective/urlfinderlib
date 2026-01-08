@@ -1,11 +1,10 @@
-import validators
-
 from itertools import chain
 from typing import Set, Union
 
+import validators
+
 import urlfinderlib.helpers as helpers
 import urlfinderlib.tokenizer as tokenizer
-
 from urlfinderlib.url import URLList
 
 

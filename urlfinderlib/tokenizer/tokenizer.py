@@ -1,5 +1,4 @@
 import re
-
 from typing import Iterator, List, Union
 
 
@@ -22,7 +21,7 @@ class UTF8Tokenizer:
         return new_tokenizer.get_split_tokens()
 
     def get_ascii_strings(self, length: int = 4) -> Iterator[str]:
-        pattern = b"[\x20-\x7E]{%b,}" % str(length).encode("ascii", errors="ignore")
+        pattern = b"[\x20-\x7e]{%b,}" % str(length).encode("ascii", errors="ignore")
         return (x.group(0).decode("ascii") for x in re.finditer(pattern, self.blob))
 
     def get_sentences(self) -> Iterator[str]:

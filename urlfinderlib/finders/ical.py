@@ -1,8 +1,10 @@
-from icalendar import Calendar
 from typing import Set, Union
 
-from .text import TextUrlFinder
+from icalendar import Calendar
+
 from urlfinderlib.url import URLList
+
+from .text import TextUrlFinder
 
 
 def _remove_lines_after_end(ical_text: str) -> str:

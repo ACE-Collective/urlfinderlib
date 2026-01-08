@@ -154,9 +154,7 @@ def test_unicode():
 <a href="http://√.com"></a>
 </body>
 </html>
-""".encode(
-        "utf-8", errors="ignore"
-    )
+""".encode("utf-8", errors="ignore")
 
     expected_urls = {"http://উদাহরণ.বাংলা/😉", "http://√.com"}
 
@@ -172,7 +170,7 @@ def test_url_in_paragraph():
 
 
 def test_url_in_query_value():
-    html = u'<html><body><a href="https://www.domain.com/redirect?url=http://√.com"></a></body></html>'
+    html = '<html><body><a href="https://www.domain.com/redirect?url=http://√.com"></a></body></html>'
     finder = urlfinderlib.finders.HtmlUrlFinder(html.encode("utf-8"))
     assert finder.find_urls() == {"https://www.domain.com/redirect?url=http://√.com"}
 

@@ -1,19 +1,19 @@
 import base64
 import binascii
 import html
-import idna
 import ipaddress
 import json
 import re
-import tld
-import validators
 import string
 from collections import UserList
 from typing import AnyStr, Dict, List, Set, Union
-from urllib.parse import parse_qs, quote, unquote, urlparse, urlsplit, ParseResult, SplitResult
+from urllib.parse import ParseResult, SplitResult, parse_qs, quote, unquote, urlparse, urlsplit
+
+import idna
+import tld
+import validators
 
 import urlfinderlib.helpers as helpers
-
 
 # The base64 strings we want are usually preceeded by a character in the URL such as: ", ', #, or /
 # If these were not at the beginning of the regex statement, we would find additional URLs, but they
@@ -250,18 +250,26 @@ class URL:
     @property
     def netloc_idna(self) -> str:
         if self._netloc_idna is None:
-            if all(ord(char) < 128 for char in self.split_value.netloc):
-                self._netloc_idna = self.split_value.netloc.lower()
+            netloc = self.split_value.netloc
+
+            # Decode percent-encoded sequences in netloc
+            if "%" in netloc:
+                netloc = unquote(netloc)
+
+            if all(ord(char) < 128 for char in netloc):
+                self._netloc_idna = netloc.lower()
                 return self._netloc_idna
 
             try:
-                idna_hostname = idna.encode(self.split_value.hostname).decode("utf-8").lower()
-                self._netloc_idna = self.split_value.netloc.replace(self.split_value.hostname, idna_hostname)
+                hostname = urlsplit(f"http://{netloc}").hostname or netloc
+                idna_hostname = idna.encode(hostname).decode("utf-8").lower()
+                self._netloc_idna = netloc.lower().replace(hostname.lower(), idna_hostname)
                 return self._netloc_idna
             except idna.core.IDNAError:
                 try:
-                    idna_hostname = self.split_value.hostname.encode("idna").decode("utf-8", errors="ignore").lower()
-                    self._netloc_idna = self.split_value.netloc.replace(self.split_value.hostname, idna_hostname)
+                    hostname = urlsplit(f"http://{netloc}").hostname or netloc
+                    idna_hostname = hostname.encode("idna").decode("utf-8", errors="ignore").lower()
+                    self._netloc_idna = netloc.lower().replace(hostname.lower(), idna_hostname)
                     return self._netloc_idna
                 except UnicodeError:
                     self._netloc_idna = ""
@@ -280,15 +288,21 @@ class URL:
     @property
     def netloc_unicode(self) -> str:
         if self._netloc_unicode is None:
-            if any(ord(char) >= 128 for char in self.split_value.netloc):
-                self._netloc_unicode = self.split_value.netloc.lower()
+            netloc = self.split_value.netloc
+
+            # Decode percent-encoded sequences in netloc
+            if "%" in netloc:
+                netloc = unquote(netloc)
+
+            if any(ord(char) >= 128 for char in netloc):
+                self._netloc_unicode = netloc.lower()
                 return self._netloc_unicode
 
             try:
-                self._netloc_unicode = idna.decode(self.split_value.netloc).lower()
+                self._netloc_unicode = idna.decode(netloc).lower()
                 return self._netloc_unicode
             except idna.core.IDNAError:
-                self._netloc_unicode = self.split_value.netloc.encode("utf-8", errors="ignore").decode("idna").lower()
+                self._netloc_unicode = netloc.encode("utf-8", errors="ignore").decode("idna").lower()
                 return self._netloc_unicode
 
         return self._netloc_unicode
@@ -436,7 +450,7 @@ class URL:
 
     def decode_proofpoint_v2(self) -> str:
         maketrans = str.maketrans
-        trans = maketrans('-_', '%/')
+        trans = maketrans("-_", "%/")
         try:
             query_url = self.query_dict["u"][0]
             url_encoded_url = query_url.translate(trans)
@@ -448,12 +462,12 @@ class URL:
         except KeyError:
             return ""
 
-    # Official decoder code from Proofpoint 
+    # Official decoder code from Proofpoint
     # https://help.proofpoint.com/@api/deki/files/2775/urldecoder.py?revision=1
     def decode_proofpoint_v3(self) -> str:
         v3_single_slash = re.compile(r"^([a-z0-9+.-]+:/)([^/].+)", re.IGNORECASE)
         v3_run_mapping = {}
-        run_values = string.ascii_uppercase + string.ascii_lowercase + string.digits + '-' + '_'
+        run_values = string.ascii_uppercase + string.ascii_lowercase + string.digits + "-" + "_"
         run_length = 2
         for value in run_values:
             v3_run_mapping[value] = run_length
@@ -463,13 +477,13 @@ class URL:
             nonlocal current_marker
             nonlocal decoded_characters
             nonlocal v3_run_mapping
-            if token == '*':
+            if token == "*":
                 character = decoded_characters[current_marker]
                 current_marker += 1
                 return character
-            if token.startswith('**'):
+            if token.startswith("**"):
                 run_length = v3_run_mapping[token[-1]]
-                run = decoded_characters[current_marker:current_marker + run_length]
+                run = decoded_characters[current_marker : current_marker + run_length]
                 current_marker += run_length
                 return run
 
@@ -477,14 +491,15 @@ class URL:
             v3_token_pattern = re.compile(r"\*(\*.)?")
             match = v3_token_pattern.search(text, start_pos)
             if match:
-                start = text[start_pos:match.start()]
+                start = text[start_pos : match.start()]
                 built_string = start
-                token = text[match.start():match.end()]
+                token = text[match.start() : match.end()]
                 built_string += replace_token(token)
                 built_string += substitute_tokens(text, match.end())
                 return built_string
             else:
-                return text[start_pos:len(text)]
+                return text[start_pos : len(text)]
+
         try:
             match = re.search(r"v3/__(.+?)__;(.*?)!", self.value, re.IGNORECASE)
             embedded_url = match.group(1)
@@ -495,7 +510,7 @@ class URL:
                 embedded_url = single_slash[0][0] + "/" + single_slash[0][1]
             embedded_url = unquote(embedded_url)
 
-            base64_characters += '=='
+            base64_characters += "=="
             decoded_characters = base64.urlsafe_b64decode(base64_characters).decode("utf-8")
             current_marker = 0
 

@@ -1,8 +1,9 @@
 from typing import Set, Union
 from xml.etree import cElementTree
 
-from .text import TextUrlFinder
 from urlfinderlib.url import URLList
+
+from .text import TextUrlFinder
 
 
 class XmlUrlFinder:

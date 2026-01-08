@@ -1,9 +1,9 @@
 from typing import Set, Union
 
 import urlfinderlib.tokenizer as tokenizer
+from urlfinderlib.url import URLList
 
 from .text import TextUrlFinder
-from urlfinderlib.url import URLList
 
 
 class DataUrlFinder:
