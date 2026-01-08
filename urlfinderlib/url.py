@@ -192,10 +192,7 @@ class URL:
     @property
     def is_netloc_valid_tld(self) -> bool:
         if self._is_netloc_valid_tld is None:
-            try:
-                self._is_netloc_valid_tld = bool(tld.get_tld(self.value, fail_silently=True))
-            except:
-                self._is_netloc_valid_tld = False
+            self._is_netloc_valid_tld = bool(tld.get_tld(self.value, fail_silently=True))
 
         return self._is_netloc_valid_tld
 
@@ -246,7 +243,7 @@ class URL:
                 return False
 
             encoded_url = helpers.build_url(self.split_value.scheme, self.netloc_idna, self.path_percent_encoded)
-            self._is_valid_format = bool(validators.url(encoded_url))
+            self._is_valid_format = bool(validators.url(encoded_url, simple_host=True))
 
         return self._is_valid_format
 

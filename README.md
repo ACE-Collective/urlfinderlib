@@ -1,6 +1,6 @@
 # urlfinderlib
 
-This is a Python (3.6+) library for finding URLs in documents and checking their validity.
+This is a Python (3.10+) library for finding URLs in documents and checking their validity.
 
 ## Supported Documents
 

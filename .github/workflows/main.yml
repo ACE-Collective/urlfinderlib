@@ -1,30 +1,34 @@
 name: Build and Test
 
-# Runs only when there is a pull request against the main branch
 on:
   pull_request:
-    branches: [ main ]
-
-  # Allows you to run this workflow manually from the Actions tab
+    branches: [main]
   workflow_dispatch:
 
-# All of the jobs run in parallel, but each step within a job is sequential
 jobs:
-  urlfinderlib:
+  test:
     name: Tests
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-          
-      - name: Setup python
-        uses: actions/setup-python@v2
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libmagic1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: '3.9'
+          enable-cache: true
 
-      - name: Install Python dependencies
-        uses: py-actions/py-dependency-install@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
 
-      - name: Pytest & Coverage
-        run: pytest
+      - name: Install dependencies
+        run: uv sync --locked --dev
+
+      - name: Run tests
+        run: uv run pytest

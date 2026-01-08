@@ -1,2 +1,62 @@
+[project]
+name = "urlfinderlib"
+version = "0.19.0"
+description = "Library to find URLs and check their validity."
+readme = "README.md"
+license = "Apache-2.0"
+authors = [{ name = "Matthew Wilson", email = "dev@bytecafe.io" }]
+keywords = ["url", "urlfinderlib"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "icalendar>=6.3.2",
+    "idna>=3.11",
+    "lxml>=6.0.2",
+    "python-magic>=0.4.27",
+    "tld>=0.13.1",
+    "validators>=0.35.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ace-ecosystem/urlfinderlib"
+Repository = "https://github.com/ace-ecosystem/urlfinderlib"
+
+[project.scripts]
+urlfinder = "urlfinderlib.__main__:main"
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.22,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+
 [tool.black]
 line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+    "--cov=urlfinderlib",
+    "--cov-fail-under=100",
+    "--cov-report=term-missing",
+    "--durations=0",
+    "-ra",
+    "-v",
+]

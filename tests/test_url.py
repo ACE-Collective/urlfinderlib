@@ -177,10 +177,10 @@ def test_is_netloc_valid_tld():
 
 def test_is_url():
     for url in valid_urls:
-        assert URL(url).is_url is True
+        assert URL(url).is_url is True, f"Valid URL not recognized as valid: {url}"
 
     for url in invalid_urls:
-        assert URL(url).is_url is False
+        assert URL(url).is_url is False, f"Invalid URL recognized as valid: {url}"
 
 
 def test_is_url_ascii():
