@@ -106,3 +106,5 @@ ENV/
 .ropeproject
 
 .claude/
+
+samples/
