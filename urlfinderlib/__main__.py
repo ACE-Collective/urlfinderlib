@@ -1,3 +1,4 @@
+import argparse
 import logging
 import sys
 
@@ -5,24 +6,52 @@ import urlfinderlib
 
 
 def main():
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s %(name)s.%(funcName)s +%(lineno)s: %(levelname)-8s %(message)s",
+    parser = argparse.ArgumentParser(
+        prog="urlfinder",
+        description="Find URLs in files",
+    )
+    parser.add_argument("file", help="Path to the file to scan for URLs")
+    parser.add_argument(
+        "-b", "--base-url",
+        default="",
+        help="Base URL for resolving relative URLs (useful for HTML files)",
+    )
+    parser.add_argument(
+        "-m", "--mimetype",
+        default="",
+        help="Override auto-detected mimetype",
+    )
+    parser.add_argument(
+        "-d", "--domain-as-url",
+        action="store_true",
+        help="Treat standalone domains as URLs",
+    )
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Enable verbose/debug logging",
     )
 
-    try:
-        file_path = sys.argv[1]
-    except IndexError:
-        print("Usage: urlfinder /path/to/file")
-        sys.exit(1)
+    args = parser.parse_args()
+
+    if args.verbose:
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(asctime)s %(name)s.%(funcName)s +%(lineno)s: %(levelname)-8s %(message)s",
+        )
 
     try:
-        with open(file_path, "rb") as f:
-            urls = sorted(list(urlfinderlib.find_urls(f.read())))
+        with open(args.file, "rb") as f:
+            urls = sorted(list(urlfinderlib.find_urls(
+                f.read(),
+                base_url=args.base_url,
+                mimetype=args.mimetype,
+                domain_as_url=args.domain_as_url,
+            )))
             for url in urls:
                 print(url)
     except Exception:
-        logging.exception("exception parsing %s", file_path)
+        logging.exception("exception parsing %s", args.file)
         sys.exit(1)
 
 
