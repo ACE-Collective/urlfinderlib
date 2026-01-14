@@ -1,3 +1,5 @@
+# THIS REPOSITORY HAS MOVED TO https://github.com/ace-ecosystem/urlfinderlib
+
 # urlfinderlib
 
 This is a Python (3.10+) library for finding URLs in documents and checking their validity.
