@@ -19,7 +19,7 @@ def get_url_permutations(url: str) -> Set[str]:
     return URL(url).permutations
 
 
-def find_urls(blob: Union[bytes, str], base_url: str = "", mimetype: str = "", domain_as_url: bool = False) -> Set[str]:
+def find_urls(blob: Union[bytes, str], base_url: str = "", mimetype: str = "", domain_as_url: bool = False, ocr_safe: bool = False) -> Set[str]:
     if isinstance(blob, str):
         blob = blob.encode("utf-8", errors="ignore")
 
@@ -52,9 +52,9 @@ def find_urls(blob: Union[bytes, str], base_url: str = "", mimetype: str = "", d
             urls += finders.CsvUrlFinder(blob).find_urls()
         elif helpers.might_be_html(blob):
             urls += finders.HtmlUrlFinder(blob).find_urls()
-            urls += finders.TextUrlFinder(blob).find_urls(strict=True, domain_as_url=domain_as_url)
+            urls += finders.TextUrlFinder(blob).find_urls(strict=True, domain_as_url=domain_as_url, ocr_safe=ocr_safe)
         else:
-            urls += finders.TextUrlFinder(blob).find_urls(strict=True, domain_as_url=domain_as_url)
+            urls += finders.TextUrlFinder(blob).find_urls(strict=True, domain_as_url=domain_as_url, ocr_safe=ocr_safe)
     else:
         urls += finders.DataUrlFinder(blob).find_urls()
 

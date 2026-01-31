@@ -27,6 +27,11 @@ def main():
         help="Treat standalone domains as URLs",
     )
     parser.add_argument(
+        "-o", "--ocr-safe",
+        action="store_true",
+        help="Apply stricter domain validation for OCR text (reduces false positives when used with -d)",
+    )
+    parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="Enable verbose/debug logging",
@@ -47,6 +52,7 @@ def main():
                 base_url=args.base_url,
                 mimetype=args.mimetype,
                 domain_as_url=args.domain_as_url,
+                ocr_safe=args.ocr_safe,
             )))
             for url in urls:
                 print(url)

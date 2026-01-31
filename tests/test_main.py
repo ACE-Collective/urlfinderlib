@@ -132,3 +132,49 @@ def test_main_help(capsys):
     assert "--mimetype" in captured.out
     assert "--domain-as-url" in captured.out
     assert "--verbose" in captured.out
+    assert "--ocr-safe" in captured.out
+
+
+def test_main_with_ocr_safe(capsys):
+    """Test that main() applies OCR-safe filtering when --ocr-safe flag is used."""
+    test_file = f"{files_dir}/ocr_test.txt"
+
+    # With -d but without --ocr-safe, short domains and non-ASCII domains should be found
+    with mock.patch.object(sys, "argv", ["urlfinder", "-d", test_file]):
+        main()
+
+    captured = capsys.readouterr()
+    assert "https://ng.cam" in captured.out
+    assert "https://ur.com" in captured.out
+    assert "470s.is" in captured.out  # Non-ASCII domain gets IDNA encoded
+    assert "https://example.com" in captured.out
+
+    # With -d and --ocr-safe, short domains and non-ASCII domains should be filtered out
+    with mock.patch.object(sys, "argv", ["urlfinder", "-d", "-o", test_file]):
+        main()
+
+    captured = capsys.readouterr()
+    assert "https://ng.cam" not in captured.out
+    assert "https://ur.com" not in captured.out
+    assert "470s.is" not in captured.out  # Non-ASCII domain should be filtered
+    assert "https://example.com" in captured.out
+    assert "https://longdomainname.org" in captured.out
+
+
+def test_main_ocr_safe_without_domain_as_url(capsys):
+    """Test that --ocr-safe has no effect without -d flag."""
+    test_file = f"{files_dir}/ocr_test.txt"
+
+    # Without -d, neither flag should find standalone domains
+    with mock.patch.object(sys, "argv", ["urlfinder", test_file]):
+        main()
+
+    captured_without = capsys.readouterr()
+
+    with mock.patch.object(sys, "argv", ["urlfinder", "-o", test_file]):
+        main()
+
+    captured_with = capsys.readouterr()
+
+    # Both should produce the same output (no URLs found)
+    assert captured_without.out == captured_with.out

@@ -1,5 +1,6 @@
 from itertools import chain
 from typing import Set, Union
+import socket
 
 import validators
 
@@ -15,7 +16,39 @@ class TextUrlFinder:
 
         self.blob = blob
 
-    def find_urls(self, strict: bool = True, domain_as_url: bool = False) -> Set[str]:
+    def _is_ocr_safe_domain(self, token: str) -> bool:
+        """
+        Apply stricter validation rules for domains in OCR text to reduce false positives.
+
+        Rules:
+        1. Domain must not contain non-ASCII characters (before IDNA encoding)
+        2. All domain labels (parts between dots, excluding TLD) must be at least 3 characters
+        3. Total domain length (excluding TLD) must be at least 4 characters
+        """
+        # Rule 1: Reject non-ASCII characters
+        if not token.isascii():
+            return False
+
+        # Split domain into parts
+        parts = token.lower().split(".")
+        if len(parts) < 2:
+            return False
+
+        # Exclude TLD from length checks
+        domain_parts = parts[:-1]  # Everything except TLD
+
+        # Rule 2: Each label must be at least 3 characters
+        if any(len(part) < 3 for part in domain_parts):
+            return False
+
+        # Rule 3: Total domain length (excluding TLD) must be at least 4 characters
+        total_length = sum(len(part) for part in domain_parts)
+        if total_length < 4:
+            return False
+
+        return True
+
+    def find_urls(self, strict: bool = True, domain_as_url: bool = False, ocr_safe: bool = False) -> Set[str]:
         tok = tokenizer.UTF8Tokenizer(self.blob)
 
         token_iter = chain(
@@ -40,6 +73,8 @@ class TextUrlFinder:
                     continue
 
                 if validators.domain(token):
+                    if ocr_safe and not self._is_ocr_safe_domain(token):
+                        continue
                     tokens.add(token)
 
             for token in split_token_iter:
@@ -48,6 +83,8 @@ class TextUrlFinder:
                     continue
 
                 if validators.domain(token):
+                    if ocr_safe and not self._is_ocr_safe_domain(token):
+                        continue
                     tokens.add(token)
         else:
             tokens = {t for t in token_iter if "." in t and "/" in t}
