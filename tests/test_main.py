@@ -26,14 +26,14 @@ def test_main_finds_urls(capsys):
 
 
 def test_main_no_arguments(capsys):
-    """Test that main() prints usage and exits with code 1 when no file path is provided."""
+    """Test that main() prints usage and exits with code 2 when no file path is provided."""
     with mock.patch.object(sys, "argv", ["urlfinder"]):
         with pytest.raises(SystemExit) as exc_info:
             main()
 
-    assert exc_info.value.code == 1
+    assert exc_info.value.code == 2
     captured = capsys.readouterr()
-    assert "Usage: urlfinder /path/to/file" in captured.out
+    assert "usage: urlfinder" in captured.err
 
 
 def test_main_file_not_found():
@@ -62,4 +62,4 @@ def test_main_module_execution_no_args():
         with pytest.raises(SystemExit) as exc_info:
             runpy.run_module("urlfinderlib", run_name="__main__", alter_sys=True)
 
-    assert exc_info.value.code == 1
+    assert exc_info.value.code == 2

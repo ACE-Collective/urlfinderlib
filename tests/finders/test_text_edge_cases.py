@@ -50,6 +50,24 @@ def test_url_in_query_value():
     assert finder.find_urls() == {"https://www.domain.com/redirect?url=http://√.com"}
 
 
+def test_unicode_quotes_not_detected_as_urls():
+    text = "\u2018sr.no Hem Description".encode("utf-8")
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    urls = finder.find_urls(domain_as_url=True)
+    # The curly-quote-prefixed URL and its IDNA encoding must not appear
+    assert "https://\u2018sr.no" not in urls
+    assert "https://xn--sr-j2t.no" not in urls
+
+
+def test_guillemet_garbled_domain_not_detected():
+    text = "«™.470s.is".encode("utf-8")
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    urls = finder.find_urls(domain_as_url=True)
+    assert "https://«™.470s.is" not in urls
+    assert "https://xn--tm-yda.470s.is" not in urls
+    assert len(urls) == 0
+
+
 def test_url_next_to_url():
     text = "This is a test click here domain.com/test<https://protect2.fireeye.com/url?u=https://domain.com/test> test."
     finder = urlfinderlib.finders.TextUrlFinder(text)
@@ -57,3 +75,24 @@ def test_url_next_to_url():
         "https://domain.com/test",
         "https://protect2.fireeye.com/url?u=https://domain.com/test",
     }
+
+
+def test_cidr_notation_not_detected():
+    text = b'"sourceIPAddress": "0.0.0.0", "cidr": "0.0.0.0/0", "vpc": "10.0.0.0/8"'
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    assert finder.find_urls() == set()
+    assert finder.find_urls(domain_as_url=True) == set()
+
+
+def test_ip_url_with_explicit_scheme_still_detected():
+    text = b"visit http://192.168.1.1/24 for details"
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    assert "http://192.168.1.1/24" in finder.find_urls()
+
+
+def test_trailing_punctuation_stripped():
+    text = b"visit http://domain.com/path, then continue"
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    urls = finder.find_urls()
+    assert "http://domain.com/path" in urls
+    assert "http://domain.com/path," not in urls
