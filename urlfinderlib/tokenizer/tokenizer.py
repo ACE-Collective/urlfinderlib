@@ -1,4 +1,5 @@
 import re
+from itertools import chain
 from typing import Iterator, List, Union
 
 
@@ -73,7 +74,11 @@ class UTF8Tokenizer:
         return (x for x in (self.utf8_string[indices[i] + 1 : indices[i + 1]] for i in range(len(indices) - 1)) if x)
 
     def get_tokens_between_single_quotes(self) -> Iterator[str]:
-        return self.get_tokens_between_sequence("'")
+        return chain(
+            self.get_tokens_between_sequence("'"),
+            self.get_tokens_between_sequence("\u2018"),
+            self.get_tokens_between_sequence("\u2019"),
+        )
 
     def get_tokens_between_spaces(self) -> Iterator[str]:
         return self.get_tokens_between_sequence(" ")

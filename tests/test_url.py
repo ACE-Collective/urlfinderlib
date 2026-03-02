@@ -87,6 +87,9 @@ def test_get_netloc_idna():
     assert URL("http://DOMAIN.COM").netloc_idna == "domain.com"
     assert URL("http://dom[ain.com").netloc_idna == ""
     assert URL("http://domain\x8a.com").netloc_idna == ""
+    assert URL("https://«™.470s.is").netloc_idna == ""
+    assert URL("http://√.com").netloc_idna == "xn--19g.com"
+    assert URL("http://😉.com").netloc_idna == "xn--n28h.com"
 
 
 def test_get_netloc_unicode():

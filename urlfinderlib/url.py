@@ -5,6 +5,7 @@ import ipaddress
 import json
 import re
 import string
+import unicodedata
 from collections import UserList
 from typing import AnyStr, Dict, List, Set, Union
 from urllib.parse import ParseResult, SplitResult, parse_qs, quote, unquote, urlparse, urlsplit
@@ -192,7 +193,11 @@ class URL:
     @property
     def is_netloc_valid_tld(self) -> bool:
         if self._is_netloc_valid_tld is None:
-            self._is_netloc_valid_tld = bool(tld.get_tld(self.value, fail_silently=True))
+            hostname = self.split_value.hostname
+            if not hostname or "." not in hostname:
+                self._is_netloc_valid_tld = False
+            else:
+                self._is_netloc_valid_tld = bool(tld.get_tld(self.value, fail_silently=True))
 
         return self._is_netloc_valid_tld
 
@@ -266,8 +271,25 @@ class URL:
                 self._netloc_idna = netloc.lower().replace(hostname.lower(), idna_hostname)
                 return self._netloc_idna
             except idna.core.IDNAError:
+                hostname = urlsplit(f"http://{netloc}").hostname or netloc
+
+                # Reject hostnames containing Unicode punctuation (Pi/Pf categories)
+                # like « » ' ' " " or characters whose NFKC normalization maps
+                # entirely to ASCII (e.g. ™ → TM) which should never appear in
+                # domain names.
+                for c in hostname:
+                    if ord(c) < 128:
+                        continue
+                    cat = unicodedata.category(c)
+                    if cat in ("Pi", "Pf"):
+                        self._netloc_idna = ""
+                        return self._netloc_idna
+                    nfkc = unicodedata.normalize("NFKC", c)
+                    if nfkc != c and all(ord(ch) < 128 for ch in nfkc):
+                        self._netloc_idna = ""
+                        return self._netloc_idna
+
                 try:
-                    hostname = urlsplit(f"http://{netloc}").hostname or netloc
                     idna_hostname = hostname.encode("idna").decode("utf-8", errors="ignore").lower()
                     self._netloc_idna = netloc.lower().replace(hostname.lower(), idna_hostname)
                     return self._netloc_idna

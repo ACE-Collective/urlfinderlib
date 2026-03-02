@@ -1,7 +1,11 @@
 import base64
+import ipaddress
+import re
 from urllib.parse import urlsplit
 
 import validators
+
+_CIDR_PATTERN = re.compile(r"^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/(\d{1,2})$")
 
 
 def build_url(scheme: str, netloc: str, path: str) -> str:
@@ -21,6 +25,7 @@ def fix_possible_value(value: str) -> str:
     value = remove_mailto_if_not_email_address(value)
     value = remove_null_characters(value)
     value = remove_surrounding_quotes(value)
+    value = value.rstrip(",;!?")
     return value
 
 
@@ -65,6 +70,9 @@ def might_be_html(value: bytes) -> bool:
 def prepend_missing_scheme(value: str, domain_as_url: bool = False) -> str:
     value = value.lstrip(":/")
 
+    if _is_cidr_notation(value):
+        return value
+
     try:
         split_value = urlsplit(value)
     except ValueError:
@@ -78,6 +86,17 @@ def prepend_missing_scheme(value: str, domain_as_url: bool = False) -> str:
             value = f"https://{value}"
 
     return value
+
+
+def _is_cidr_notation(value: str) -> bool:
+    match = _CIDR_PATTERN.match(value)
+    if not match:
+        return False
+    try:
+        ipaddress.ip_address(match.group(1))
+        return 0 <= int(match.group(2)) <= 32
+    except ValueError:
+        return False
 
 
 def remove_hidden_unicode_characters(value: str) -> str:
