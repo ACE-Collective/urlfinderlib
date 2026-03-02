@@ -31,8 +31,25 @@ class TextUrlFinder:
         )
 
         split_token_iter = tok.get_split_tokens_after_replace(
-            ["<", ">", "`", "[", "]", "{", "}", '"', "'", "(", ")",
-             "\u2018", "\u2019", "\u201c", "\u201d", "\u00ab", "\u00bb"]
+            [
+                "<",
+                ">",
+                "`",
+                "[",
+                "]",
+                "{",
+                "}",
+                '"',
+                "'",
+                "(",
+                ")",
+                "\u2018",
+                "\u2019",
+                "\u201c",
+                "\u201d",
+                "\u00ab",
+                "\u00bb",
+            ]
         )
 
         if domain_as_url:
