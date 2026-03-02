@@ -10,7 +10,7 @@ jobs:
     name: Publish to PyPI
     runs-on: ubuntu-latest
     environment:
-      name: pypi
+      name: PyPI
       url: https://pypi.org/p/urlfinderlib
     permissions:
       id-token: write
