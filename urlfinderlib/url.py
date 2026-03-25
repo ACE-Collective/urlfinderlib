@@ -20,6 +20,7 @@ import urlfinderlib.helpers as helpers
 # If these were not at the beginning of the regex statement, we would find additional URLs, but they
 # are often malformed when decoded, as they are buried inside of a larger URL encoding scheme.
 base64_pattern = re.compile(r"[\"\'\#\/](((aHR0c)|(ZnRw))[a-zA-Z0-9]+)")
+base64_value_pattern = re.compile(r"^[A-Za-z0-9+/\-_]+=*$")
 
 
 # TODO: Change this to inherit from a set
@@ -546,6 +547,34 @@ class URL:
         fixed_base64_values = {helpers.fix_possible_value(v) for v in self.get_base64_values()}
         return {u for u in fixed_base64_values if URL(u).is_url}
 
+    def get_base64_param_urls(self) -> Set[str]:
+        urls = set()
+
+        query_string = self.split_value.query
+        if not query_string:
+            return urls
+
+        for key, values in self.query_dict.items():
+            for value in values:
+                if len(value) < 8:
+                    continue
+
+                if not base64_value_pattern.match(value):
+                    continue
+
+                decoded = helpers.decode_base64_ascii(value)
+                if not decoded or decoded == value:
+                    continue
+
+                new_query = query_string.replace(value, decoded, 1)
+                new_url = f"{self.split_value.scheme}://{self.split_value.netloc}{self.split_value.path}?{new_query}"
+                if self.split_value.fragment:
+                    new_url += f"#{self.split_value.fragment}"
+
+                urls.add(new_url)
+
+        return urls
+
     def get_base64_values(self) -> Set[str]:
         values = set()
 
@@ -561,6 +590,7 @@ class URL:
         child_urls += self.get_query_urls()
         child_urls += self.get_fragment_urls()
         child_urls += self.get_base64_urls()
+        child_urls += self.get_base64_param_urls()
 
         if self.is_mandrillapp:
             decoded_url = self.decode_mandrillapp()

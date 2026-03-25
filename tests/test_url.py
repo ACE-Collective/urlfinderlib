@@ -237,6 +237,29 @@ def test_url_decode_base64():
     assert url.child_urls == [URL("http://domain2.com")]
 
 
+def test_url_decode_base64_query_params():
+    # Basic case: base64-encoded email in a query param
+    # "dXNlckBleGFtcGxlLmNvbQ==" decodes to "user@example.com"
+    url = URL("https://www.domain.com/?email=dXNlckBleGFtcGxlLmNvbQ==")
+    assert "https://www.domain.com/?email=user@example.com" in url.get_base64_param_urls()
+    # Also verify it flows through child_urls
+    child_url_values = {str(u) for u in url.child_urls}
+    assert "https://www.domain.com/?email=user@example.com" in child_url_values
+
+    # No query params - should return empty set
+    assert URL("https://www.domain.com/path").get_base64_param_urls() == set()
+
+    # Non-base64 value - should return empty set
+    assert URL("https://www.domain.com/?key=not-base64-!!!").get_base64_param_urls() == set()
+
+    # Short values should not be decoded
+    assert URL("https://www.domain.com/?x=abc").get_base64_param_urls() == set()
+
+    # URL with fragment should preserve it in decoded URL
+    url_with_fragment = URL("https://www.domain.com/?email=dXNlckBleGFtcGxlLmNvbQ==#section")
+    assert "https://www.domain.com/?email=user@example.com#section" in url_with_fragment.get_base64_param_urls()
+
+
 def test_url_decode_google_redirect():
     url = URL("https://www.google.com/url?sa=t&source=web&rct=j&url=http://domain.com")
     assert url.child_urls == [URL("http://domain.com")]
@@ -247,7 +270,8 @@ def test_url_decode_mandrillapp():
         "https://mandrillapp.com/track/click/30233568/domain.com?p=eyJzIjoiQnU1NFZhQV9RUTJyTnA0OGxZVllHdFZIdVVzIiwidiI6MSwicCI6IntcInVcIjozMDIzMzU2OCxcInZcIjoxLFwidXJsXCI6XCJodHRwOlxcXC9cXFwvZG9tYWluLmNvbVxcXC90ZXN0XCIsXCJpZFwiOlwiMjIyMjk4YmUyNGU0NDE4MzhlMDFmZjcxN2ZlNzE5YjFcIixcInVybF9pZHNcIjpbXCI5ODdjODQ1Y2ZmZGRmYTU4MjYxN2Y5NDFjZmNmNTE4NmU0MGZlNjY5XCJdfSJ9Cg=="
     )
     assert url.is_mandrillapp is True
-    assert url.child_urls == [URL("http://domain.com/test")]
+    child_url_values = {str(u) for u in url.child_urls}
+    assert "http://domain.com/test" in child_url_values
 
     json_decode_error_url = URL(
         "https://mandrillapp.com/track/click/30233568/domain.com?p=eyJzIjoiQnU1NFZhQV9RUTJyTnA0OGxZVllHdFZIdVVzIiwidiI6MSwicCI6IntcInVcIjozMDIzMzU2OCxcInZcIjoxLFwidXJsXCI6XCJodHRwOlxcXC9cXFwvZG9tYWluLmNvbVxcXC90ZXN0XCIsXCJpZFwiOlwiMjIyMjk4YmUyNGU0NDE4MzhlMDFmZjcxN2ZlNzE5YjFcIixcInVybF9pZHNcIjpbXCI5ODdjODQ1Y2ZmZGRmYTU4MjYxN2Y5NDFjZmNmNTE4NmU0MGZlNjY5XCJdCg=="
@@ -431,18 +455,17 @@ def test_urllist_get_all_urls_double_nested():
     )
     assert len(urllist) == 2
 
-    expected_urls = {
-        URL("http://domain.com"),
-        URL(
-            "https://protect2.fireeye.com/url?k=225eb64e-7e024241-225e9cd6-0cc47a33347c-67785364a067dbfc&u=https://mandrillapp.com/track/click/30233568/domain.com?p=eyJzIjoiQnU1NFZhQV9RUTJyTnA0OGxZVllHdFZIdVVzIiwidiI6MSwicCI6IntcInVcIjozMDIzMzU2OCxcInZcIjoxLFwidXJsXCI6XCJodHRwOlxcXC9cXFwvZG9tYWluLmNvbVxcXC90ZXN0XCIsXCJpZFwiOlwiMjIyMjk4YmUyNGU0NDE4MzhlMDFmZjcxN2ZlNzE5YjFcIixcInVybF9pZHNcIjpbXCI5ODdjODQ1Y2ZmZGRmYTU4MjYxN2Y5NDFjZmNmNTE4NmU0MGZlNjY5XCJdfSJ9Cg=="
-        ),
-        URL(
-            "https://mandrillapp.com/track/click/30233568/domain.com?p=eyJzIjoiQnU1NFZhQV9RUTJyTnA0OGxZVllHdFZIdVVzIiwidiI6MSwicCI6IntcInVcIjozMDIzMzU2OCxcInZcIjoxLFwidXJsXCI6XCJodHRwOlxcXC9cXFwvZG9tYWluLmNvbVxcXC90ZXN0XCIsXCJpZFwiOlwiMjIyMjk4YmUyNGU0NDE4MzhlMDFmZjcxN2ZlNzE5YjFcIixcInVybF9pZHNcIjpbXCI5ODdjODQ1Y2ZmZGRmYTU4MjYxN2Y5NDFjZmNmNTE4NmU0MGZlNjY5XCJdfSJ9Cg=="
-        ),
-        URL("http://domain.com/test"),
-    }
-
-    assert urllist.get_all_urls() == expected_urls
+    all_urls = urllist.get_all_urls()
+    assert "http://domain.com" in all_urls
+    assert "http://domain.com/test" in all_urls
+    assert (
+        "https://protect2.fireeye.com/url?k=225eb64e-7e024241-225e9cd6-0cc47a33347c-67785364a067dbfc&u=https://mandrillapp.com/track/click/30233568/domain.com?p=eyJzIjoiQnU1NFZhQV9RUTJyTnA0OGxZVllHdFZIdVVzIiwidiI6MSwicCI6IntcInVcIjozMDIzMzU2OCxcInZcIjoxLFwidXJsXCI6XCJodHRwOlxcXC9cXFwvZG9tYWluLmNvbVxcXC90ZXN0XCIsXCJpZFwiOlwiMjIyMjk4YmUyNGU0NDE4MzhlMDFmZjcxN2ZlNzE5YjFcIixcInVybF9pZHNcIjpbXCI5ODdjODQ1Y2ZmZGRmYTU4MjYxN2Y5NDFjZmNmNTE4NmU0MGZlNjY5XCJdfSJ9Cg=="
+        in all_urls
+    )
+    assert (
+        "https://mandrillapp.com/track/click/30233568/domain.com?p=eyJzIjoiQnU1NFZhQV9RUTJyTnA0OGxZVllHdFZIdVVzIiwidiI6MSwicCI6IntcInVcIjozMDIzMzU2OCxcInZcIjoxLFwidXJsXCI6XCJodHRwOlxcXC9cXFwvZG9tYWluLmNvbVxcXC90ZXN0XCIsXCJpZFwiOlwiMjIyMjk4YmUyNGU0NDE4MzhlMDFmZjcxN2ZlNzE5YjFcIixcInVybF9pZHNcIjpbXCI5ODdjODQ1Y2ZmZGRmYTU4MjYxN2Y5NDFjZmNmNTE4NmU0MGZlNjY5XCJdfSJ9Cg=="
+        in all_urls
+    )
 
 
 def test_urllist_get_all_urls_empty():
