@@ -54,6 +54,16 @@ def get_ascii_url(url: str) -> str:
     return url.encode("ascii", errors="ignore").decode()
 
 
+def decode_base64_ascii(value: str) -> str:
+    """Try to decode a base64 string (standard or URL-safe) as ASCII. Returns the decoded string or empty string on failure."""
+    for decoder in (base64.b64decode, base64.urlsafe_b64decode):
+        try:
+            return decoder(f"{value}===").decode("ascii").strip()
+        except Exception:
+            continue
+    return ""
+
+
 def is_base64_ascii(value: str) -> bool:
     try:
         base64.b64decode(f"{value}===").decode("ascii")
