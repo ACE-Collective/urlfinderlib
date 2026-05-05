@@ -4,6 +4,7 @@ from icalendar import Calendar
 
 from urlfinderlib.url import URLList
 
+from .html import HtmlUrlFinder
 from .text import TextUrlFinder
 
 
@@ -33,14 +34,20 @@ class IcalUrlFinder:
 
         ical = Calendar.from_ical(self.blob)
         for component in ical.walk():
-            if component.name == "VEVENT":
-                description = component.get("description")
-                location = component.get("location")
+            for _, value in component.property_items():
+                # vText/vCalAddress/vUri all subclass str; vDDDTypes/vGeo/etc. don't.
+                # BEGIN/END markers come through as bytes.
+                if not isinstance(value, str):
+                    continue
 
-                if description:
-                    urls += TextUrlFinder(description).find_urls(strict=True)
+                fmttype = ""
+                params = getattr(value, "params", None)
+                if params:
+                    fmttype = str(params.get("FMTTYPE", "")).lower()
 
-                if location:
-                    urls += TextUrlFinder(location).find_urls(strict=True)
+                if fmttype.startswith("text/html"):
+                    urls += HtmlUrlFinder(value).find_urls()
+                else:
+                    urls += TextUrlFinder(value).find_urls(strict=True)
 
         return set(urls)
