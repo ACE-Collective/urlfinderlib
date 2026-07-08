@@ -186,3 +186,34 @@ def test_window_location_redirect():
 
     finder = urlfinderlib.finders.HtmlUrlFinder(html)
     assert finder.find_urls() == {"http://domain.com"}
+
+
+def test_unsettable_attribute_name():
+    """lxml's HTML parser accepts attribute names that it then refuses to set.
+
+    _get_tag_attribute_values() blanks each attribute after harvesting it. Attribute names like
+    '{*45|' come back from the parser but raise ValueError on assignment, which used to abort the
+    whole find_urls() call and lose every URL in the document.
+    """
+    html = b'<a href="https://domain.com/x" {*45|="y">click</a>'
+    finder = urlfinderlib.finders.HtmlUrlFinder(html)
+    assert finder.find_urls() == {"https://domain.com/x"}
+
+
+def test_unsettable_attribute_name_does_not_hide_other_urls():
+    """A malformed attribute on one tag must not suppress URLs found on any other tag."""
+    html = (
+        b"<html><body>"
+        b'<a href="https://domain.com/login">Sign in</a>'
+        b'<div style="x" {return"function"="">spacer</div>'
+        b'<img src="https://domain.com/logo.png">'
+        b"</body></html>"
+    )
+    finder = urlfinderlib.finders.HtmlUrlFinder(html)
+    assert finder.find_urls() == {"https://domain.com/login", "https://domain.com/logo.png"}
+
+
+def test_unsettable_attribute_name_via_find_urls():
+    """The same document routed through the public find_urls() entry point."""
+    html = b'<a href="https://domain.com/x" {*45|="y">click</a>'
+    assert urlfinderlib.find_urls(html) == {"https://domain.com/x"}

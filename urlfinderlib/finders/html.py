@@ -261,13 +261,21 @@ class HtmlTreeUrlFinder:
         for element in self._tree.iter():
             values |= {v for v in element.attrib.values()}
 
-            for attrib in element.attrib:
+            # iterate over a copy since the loop body mutates the attribute values
+            for attrib in list(element.attrib):
                 # Ignore the "onclick" attribute since that contains JavaScript. By not replacing this value, it lets
                 # the TextUrlFinder attempt to extract URLs from it instead since it is not parsed by lxml.
                 if attrib.lower() == "onclick":
                     continue
 
-                element.attrib[attrib] = ""
+                try:
+                    element.attrib[attrib] = ""
+                except ValueError:
+                    # lxml's HTML parser accepts attribute names that it then refuses to set, such as
+                    # '{*45|' from malformed markup. Leave the value in place: we already harvested it
+                    # above, and the TextUrlFinder gets another pass at it. Without this guard a single
+                    # malformed attribute makes the whole document yield no URLs at all.
+                    continue
 
         return values
 

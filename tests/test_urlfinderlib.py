@@ -1,6 +1,7 @@
 import os
 
 import urlfinderlib
+from urlfinderlib.helpers import might_be_html
 from urlfinderlib.urlfinderlib import (
     _has_u_escaped_lowercase_bytes,
     _has_u_escaped_uppercase_bytes,
@@ -255,3 +256,39 @@ def test_unescape_ascii():
     assert _unescape_ascii(b"\\x4D") == b"M"
     assert _unescape_ascii(b"\\u004d") == b"M"
     assert _unescape_ascii(b"\\u004D") == b"M"
+
+
+def test_find_urls_in_text_skips_html_sniffing():
+    """might_be_html() is satisfied by any blob containing < > = : / anywhere in it.
+
+    find_urls() therefore routes plain text such as an OCR transcription or source code through the
+    HTML finder. find_urls_in_text() uses the text finder unconditionally.
+    """
+    # contains every character might_be_html() looks for, but is not HTML
+    blob = b"a<b>c=d/e visit https://domain.com/landing for details"
+
+    assert might_be_html(blob) is True
+    assert urlfinderlib.find_urls_in_text(blob) == {"https://domain.com/landing"}
+
+
+def test_find_urls_in_text_accepts_str():
+    assert urlfinderlib.find_urls_in_text("go to https://domain.com/x now") == {"https://domain.com/x"}
+
+
+def test_find_urls_in_text_domain_as_url():
+    blob = b"contact us at domain.com for details"
+
+    assert urlfinderlib.find_urls_in_text(blob) == set()
+    assert urlfinderlib.find_urls_in_text(blob, domain_as_url=True) == {"https://domain.com"}
+
+
+def test_find_urls_in_text_does_not_build_a_tree():
+    """No HTML tree is built, so relative hrefs are not resolved against <base>.
+
+    An absolute URL inside an attribute is still found -- the text tokenizer splits on quotes -- so
+    relative resolution is what actually distinguishes the two entry points.
+    """
+    blob = b'<html><head><base href="https://domain.com"></head><body><a href=index.php>x</a></body></html>'
+
+    assert urlfinderlib.find_urls(blob) == {"https://domain.com", "https://domain.com/index.php"}
+    assert urlfinderlib.find_urls_in_text(blob) == {"https://domain.com"}
