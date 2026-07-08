@@ -61,6 +61,22 @@ def find_urls(blob: Union[bytes, str], base_url: str = "", mimetype: str = "", d
     return URLList([URL(u) for u in urls]).get_all_urls()
 
 
+def find_urls_in_text(blob: Union[bytes, str], domain_as_url: bool = False) -> Set[str]:
+    """Find URLs in a blob the caller knows to be plain text.
+
+    find_urls() selects a finder by sniffing the body, and its might_be_html() test is satisfied by
+    any blob containing the characters < > = : / anywhere in it. That is true of a great deal of
+    plain text -- OCR transcriptions, source code, log lines -- and routes the blob through the HTML
+    finder as well as the text finder. Use this when the content type is already known so that no
+    sniffing is done.
+    """
+    if isinstance(blob, str):
+        blob = blob.encode("utf-8", errors="ignore")
+
+    urls = finders.TextUrlFinder(blob).find_urls(strict=True, domain_as_url=domain_as_url)
+    return URLList([URL(u) for u in urls]).get_all_urls()
+
+
 def _has_u_escaped_lowercase_bytes(blob: bytes) -> bool:
     return bool(re.search(r"\\u00[a-f0-9]{2}", blob.decode("utf-8", errors="ignore")))
 

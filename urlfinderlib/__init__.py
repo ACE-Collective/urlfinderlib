@@ -3,4 +3,4 @@ def is_url(url: str) -> bool:
 
 
 from urlfinderlib.url import URL
-from urlfinderlib.urlfinderlib import find_urls, get_url_permutations
+from urlfinderlib.urlfinderlib import find_urls, find_urls_in_text, get_url_permutations
