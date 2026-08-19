@@ -247,5 +247,9 @@ def test_xml_encoding_declaration():
 
 
 def test_xml_encoding_declaration_via_find_urls():
-    """The same document routed through the public find_urls() entry point."""
-    assert urlfinderlib.find_urls(xhtml_with_encoding_declaration) == xhtml_expected_urls
+    """The same document routed through the public find_urls() entry point.
+
+    The mimetype is pinned because libmagic builds disagree on whether this document is XHTML or
+    plain XML, and only the HTML route reaches the lxml parse this test guards.
+    """
+    assert urlfinderlib.find_urls(xhtml_with_encoding_declaration, mimetype="text/html") == xhtml_expected_urls
