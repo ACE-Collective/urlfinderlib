@@ -1,8 +1,9 @@
-.PHONY: help install test test-quick test-verbose coverage lint format clean build
+.PHONY: help install test test-quick test-verbose coverage lint format clean build bump
 
 help:
 	@echo "Available commands:"
 	@echo "  make install      - Install dependencies"
+	@echo "  make bump VERSION=X.Y.Z - Set the project version (merging to main publishes it)"
 	@echo "  make test         - Run tests with coverage"
 	@echo "  make test-quick   - Run tests without coverage"
 	@echo "  make test-verbose - Run tests with verbose output"
@@ -14,6 +15,10 @@ help:
 
 install:
 	uv sync
+
+bump:
+	@test -n "$(VERSION)" || { echo "Usage: make bump VERSION=X.Y.Z"; exit 1; }
+	uv version $(VERSION)
 
 test:
 	uv run pytest
