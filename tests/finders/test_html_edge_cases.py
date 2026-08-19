@@ -217,3 +217,39 @@ def test_unsettable_attribute_name_via_find_urls():
     """The same document routed through the public find_urls() entry point."""
     html = b'<a href="https://domain.com/x" {*45|="y">click</a>'
     assert urlfinderlib.find_urls(html) == {"https://domain.com/x"}
+
+
+xhtml_with_encoding_declaration = (
+    b'<?xml version="1.0" encoding="utf-8"?>\n'
+    b'<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" '
+    b'"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">\n'
+    b'<html xmlns="http://www.w3.org/1999/xhtml"><body>'
+    b'<a href="https://domain.com/x">click</a>'
+    b"</body></html>"
+)
+
+xhtml_expected_urls = {
+    "https://domain.com/x",
+    # the doctype and xmlns URIs really are in the document
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd",
+    "http://www.w3.org/1999/xhtml",
+}
+
+
+def test_xml_encoding_declaration():
+    """XHTML email bodies open with an <?xml ... encoding="utf-8"?> prologue.
+
+    lxml raises ValueError when a str carrying an encoding declaration is parsed, which used to
+    abort the whole find_urls() call and lose every URL in the document.
+    """
+    finder = urlfinderlib.finders.HtmlUrlFinder(xhtml_with_encoding_declaration)
+    assert finder.find_urls() == xhtml_expected_urls
+
+
+def test_xml_encoding_declaration_via_find_urls():
+    """The same document routed through the public find_urls() entry point.
+
+    The mimetype is pinned because libmagic builds disagree on whether this document is XHTML or
+    plain XML, and only the HTML route reaches the lxml parse this test guards.
+    """
+    assert urlfinderlib.find_urls(xhtml_with_encoding_declaration, mimetype="text/html") == xhtml_expected_urls
