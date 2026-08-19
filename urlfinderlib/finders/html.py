@@ -1,7 +1,7 @@
 import html
 import re
 import warnings
-from io import StringIO
+from io import BytesIO
 from itertools import chain
 from typing import Set, Union
 from urllib.parse import unquote, urljoin
@@ -21,9 +21,11 @@ warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
 def _build_tree(string: str) -> etree.Element:
     parser = etree.HTMLParser(encoding="utf-8", default_doctype=False)
 
-    tree = etree.parse(StringIO(string), parser=parser)
+    # Parse as bytes: lxml raises ValueError on a str that carries an encoding
+    # declaration (e.g. the <?xml ... encoding="utf-8"?> prologue on XHTML).
+    tree = etree.parse(BytesIO(string.encode("utf-8")), parser=parser)
     if tree.getroot() is None:
-        tree = etree.parse(StringIO("<html></html>"), parser=parser)
+        tree = etree.parse(BytesIO(b"<html></html>"), parser=parser)
 
     return tree
 
