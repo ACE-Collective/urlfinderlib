@@ -58,7 +58,7 @@ def find_urls(blob: Union[bytes, str], base_url: str = "", mimetype: str = "", d
     else:
         urls += finders.DataUrlFinder(blob).find_urls()
 
-    return URLList([URL(u) for u in urls]).get_all_urls()
+    return URLList([URL(u) for u in urls]).get_all_urls(domain_as_url=domain_as_url)
 
 
 def find_urls_in_text(blob: Union[bytes, str], domain_as_url: bool = False) -> Set[str]:
@@ -74,7 +74,7 @@ def find_urls_in_text(blob: Union[bytes, str], domain_as_url: bool = False) -> S
         blob = blob.encode("utf-8", errors="ignore")
 
     urls = finders.TextUrlFinder(blob).find_urls(strict=True, domain_as_url=domain_as_url)
-    return URLList([URL(u) for u in urls]).get_all_urls()
+    return URLList([URL(u) for u in urls]).get_all_urls(domain_as_url=domain_as_url)
 
 
 def _has_u_escaped_lowercase_bytes(blob: bytes) -> bool:

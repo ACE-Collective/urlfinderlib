@@ -234,7 +234,11 @@ def test_url_decode_barracuda():
 
 def test_url_decode_base64():
     url = URL("http://domain.com/dXNlckBkb21haW4uY29tCg==#aHR0cDovL2RvbWFpbjIuY29tCg")
-    assert url.child_urls == [URL("http://domain2.com")]
+    child_url_values = {str(u) for u in url.child_urls}
+    # the base64-encoded URL in the fragment is still decoded
+    assert "http://domain2.com" in child_url_values
+    # and the base64-encoded email in the path is now surfaced too
+    assert "http://domain.com/user@domain.com#aHR0cDovL2RvbWFpbjIuY29tCg" in child_url_values
 
 
 def test_url_decode_base64_query_params():
@@ -258,6 +262,55 @@ def test_url_decode_base64_query_params():
     # URL with fragment should preserve it in decoded URL
     url_with_fragment = URL("https://www.domain.com/?email=dXNlckBleGFtcGxlLmNvbQ==#section")
     assert "https://www.domain.com/?email=user@example.com#section" in url_with_fragment.get_base64_param_urls()
+
+    # a base64 param that decodes to IOC-free content (a tracking id) is NOT
+    # surfaced -- the gate keeps benign encoded params from spawning observables
+    # "dXNlcl9pZF8xMjM0NQ==" decodes to "user_id_12345"
+    assert URL("https://www.domain.com/?p=dXNlcl9pZF8xMjM0NQ==").get_base64_param_urls() == set()
+
+    # a base64 param that decodes to a bare domain (no scheme, no @) is only
+    # surfaced when domain_as_url is set
+    # "ZXZpbC5jb20=" decodes to "evil.com"
+    url = URL("https://www.domain.com/?p=ZXZpbC5jb20=")
+    assert url.get_base64_param_urls() == set()
+    assert "https://www.domain.com/?p=evil.com" in url.get_base64_param_urls(domain_as_url=True)
+
+
+def test_url_decode_base64_path_segments():
+    # base64-encoded email in a path segment (targeted-phishing pattern)
+    # "dXNlckBleGFtcGxlLmNvbQ==" decodes to "user@example.com"
+    url = URL("https://www.domain.com/dXNlckBleGFtcGxlLmNvbQ==")
+    assert "https://www.domain.com/user@example.com" in url.get_base64_path_urls()
+    # flows through child_urls
+    assert "https://www.domain.com/user@example.com" in {str(u) for u in url.child_urls}
+
+    # a base64 path segment that decodes to an embedded URL is surfaced too
+    url = URL("https://www.domain.com/aHR0cDovL2V2aWwuY29tL3g=")  # -> http://evil.com/x
+    assert "https://www.domain.com/http://evil.com/x" in url.get_base64_path_urls()
+
+    # query and fragment are preserved when a path segment is decoded
+    url = URL("https://www.domain.com/dXNlckBleGFtcGxlLmNvbQ==?a=1#frag")
+    assert "https://www.domain.com/user@example.com?a=1#frag" in url.get_base64_path_urls()
+
+    # no path -> empty
+    assert URL("https://www.domain.com/").get_base64_path_urls() == set()
+
+    # short segment -> not decoded
+    assert URL("https://www.domain.com/YWJj").get_base64_path_urls() == set()
+
+    # base64 that decodes to something without an email or URL is NOT surfaced,
+    # so benign tracking ids don't each spawn an observable
+    # "dXNlcl9pZF8xMjM0NQ==" decodes to "user_id_12345"
+    assert URL("https://www.domain.com/track/dXNlcl9pZF8xMjM0NQ==").get_base64_path_urls() == set()
+
+    # non-base64 path segment -> empty
+    assert URL("https://www.domain.com/about-us").get_base64_path_urls() == set()
+
+    # a base64 path segment decoding to a bare domain is only surfaced when
+    # domain_as_url is set -- "ZXZpbC5jb20=" decodes to "evil.com"
+    url = URL("https://www.domain.com/ZXZpbC5jb20=")
+    assert url.get_base64_path_urls() == set()
+    assert "https://www.domain.com/evil.com" in url.get_base64_path_urls(domain_as_url=True)
 
 
 def test_url_decode_google_redirect():
@@ -466,6 +519,15 @@ def test_urllist_get_all_urls_double_nested():
         "https://mandrillapp.com/track/click/30233568/domain.com?p=eyJzIjoiQnU1NFZhQV9RUTJyTnA0OGxZVllHdFZIdVVzIiwidiI6MSwicCI6IntcInVcIjozMDIzMzU2OCxcInZcIjoxLFwidXJsXCI6XCJodHRwOlxcXC9cXFwvZG9tYWluLmNvbVxcXC90ZXN0XCIsXCJpZFwiOlwiMjIyMjk4YmUyNGU0NDE4MzhlMDFmZjcxN2ZlNzE5YjFcIixcInVybF9pZHNcIjpbXCI5ODdjODQ1Y2ZmZGRmYTU4MjYxN2Y5NDFjZmNmNTE4NmU0MGZlNjY5XCJdfSJ9Cg=="
         in all_urls
     )
+
+
+def test_urllist_get_all_urls_domain_as_url_threads_to_base64():
+    # get_all_urls must pass domain_as_url down to the base64 child decoders, so
+    # a base64 path/param decoding to a bare domain surfaces only when set.
+    # "ZXZpbC5jb20=" decodes to "evil.com"
+    urllist = URLList([URL("https://www.domain.com/ZXZpbC5jb20=")])
+    assert "https://www.domain.com/evil.com" not in urllist.get_all_urls()
+    assert "https://www.domain.com/evil.com" in urllist.get_all_urls(domain_as_url=True)
 
 
 def test_urllist_get_all_urls_empty():

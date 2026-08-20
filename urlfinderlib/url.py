@@ -22,6 +22,46 @@ import urlfinderlib.helpers as helpers
 base64_pattern = re.compile(r"[\"\'\#\/](((aHR0c)|(ZnRw))[a-zA-Z0-9]+)")
 base64_value_pattern = re.compile(r"^[A-Za-z0-9+/\-_]+=*$")
 
+# Used to decide whether a decoded base64 token (from a URL path segment or a
+# query parameter) is worth surfacing as a child URL. Decoding every
+# base64-looking token would emit an observable for benign tracking ids; we only
+# care when the decoded value carries an email address or an embedded URL (the
+# targeted-phishing pattern where the victim's email is base64-encoded into the
+# URL).
+email_in_text_pattern = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+url_in_text_pattern = re.compile(r"(?i)\b(?:https?|ftp)://")
+
+
+def decode_base64_ioc(value: str, domain_as_url: bool = False) -> str:
+    """Decode a base64 token and return the decoded string only when it carries
+    something worth surfacing as a child URL: an email address or an embedded
+    http/ftp URL, or -- when ``domain_as_url`` is set -- a bare domain.
+
+    Returns "" to skip the token (too short, not base64, a no-op decode, or
+    IOC-free content such as a tracking id or opaque state token). Shared by
+    get_base64_param_urls and get_base64_path_urls so the query and path
+    decoders stay in lockstep. ``domain_as_url`` mirrors the flag on find_urls:
+    off by default because a base64 blob decoding to a bare domain is a weaker
+    signal than an email or a full URL and is more prone to coincidence.
+    """
+    if len(value) < 8:
+        return ""
+
+    if not base64_value_pattern.match(value):
+        return ""
+
+    decoded = helpers.decode_base64_ascii(value)
+    if not decoded or decoded == value:
+        return ""
+
+    if email_in_text_pattern.search(decoded) or url_in_text_pattern.search(decoded):
+        return decoded
+
+    if domain_as_url and validators.domain(decoded):
+        return decoded
+
+    return ""
+
 
 # TODO: Change this to inherit from a set
 class URLList(UserList):
@@ -43,14 +83,14 @@ class URLList(UserList):
             elif value.is_url_ascii:
                 self.data.append(URL(helpers.get_ascii_url(value.value)))
 
-    def get_all_urls(self) -> Set[str]:
+    def get_all_urls(self, domain_as_url: bool = False) -> Set[str]:
         if self.data:
             all_urls = []
             stack = self.data[:]
             while stack:
                 url = stack.pop()
                 all_urls.append(url.value)
-                for child_url in url.child_urls:
+                for child_url in url.get_child_urls(domain_as_url=domain_as_url):
                     stack.append(child_url)
 
             return set(all_urls)
@@ -547,7 +587,7 @@ class URL:
         fixed_base64_values = {helpers.fix_possible_value(v) for v in self.get_base64_values()}
         return {u for u in fixed_base64_values if URL(u).is_url}
 
-    def get_base64_param_urls(self) -> Set[str]:
+    def get_base64_param_urls(self, domain_as_url: bool = False) -> Set[str]:
         urls = set()
 
         query_string = self.split_value.query
@@ -556,14 +596,8 @@ class URL:
 
         for key, values in self.query_dict.items():
             for value in values:
-                if len(value) < 8:
-                    continue
-
-                if not base64_value_pattern.match(value):
-                    continue
-
-                decoded = helpers.decode_base64_ascii(value)
-                if not decoded or decoded == value:
+                decoded = decode_base64_ioc(value, domain_as_url=domain_as_url)
+                if not decoded:
                     continue
 
                 new_query = query_string.replace(value, decoded, 1)
@@ -572,6 +606,41 @@ class URL:
                     new_url += f"#{self.split_value.fragment}"
 
                 urls.add(new_url)
+
+        return urls
+
+    def get_base64_path_urls(self, domain_as_url: bool = False) -> Set[str]:
+        """Decode base64 path segments and substitute the decoded value back into
+        the URL when it carries an email address or an embedded URL (or a bare
+        domain when ``domain_as_url`` is set).
+
+        This complements get_base64_values, which only recognizes a path segment
+        that is itself a base64-encoded URL (it decodes strictly starting with
+        the encoding of http/ftp). Targeted phishing routinely encodes the
+        victim's email into the path (e.g. /dXNlckBleGFtcGxlLmNvbQ== ->
+        /user@example.com); that decodes to a non-URL, so get_base64_values
+        skips it and no child URL is ever produced. Mirrors get_base64_param_urls
+        but over path segments rather than query parameters.
+        """
+        urls = set()
+
+        path = self.split_value.path
+        if not path:
+            return urls
+
+        for segment in path.split("/"):
+            decoded = decode_base64_ioc(segment, domain_as_url=domain_as_url)
+            if not decoded:
+                continue
+
+            new_path = path.replace(segment, decoded, 1)
+            new_url = f"{self.split_value.scheme}://{self.split_value.netloc}{new_path}"
+            if self.split_value.query:
+                new_url += f"?{self.split_value.query}"
+            if self.split_value.fragment:
+                new_url += f"#{self.split_value.fragment}"
+
+            urls.add(new_url)
 
         return urls
 
@@ -584,13 +653,14 @@ class URL:
 
         return values
 
-    def get_child_urls(self) -> "URLList":
+    def get_child_urls(self, domain_as_url: bool = False) -> "URLList":
         child_urls = []
 
         child_urls += self.get_query_urls()
         child_urls += self.get_fragment_urls()
         child_urls += self.get_base64_urls()
-        child_urls += self.get_base64_param_urls()
+        child_urls += self.get_base64_param_urls(domain_as_url=domain_as_url)
+        child_urls += self.get_base64_path_urls(domain_as_url=domain_as_url)
 
         if self.is_mandrillapp:
             decoded_url = self.decode_mandrillapp()
