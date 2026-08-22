@@ -22,6 +22,13 @@ import urlfinderlib.helpers as helpers
 base64_pattern = re.compile(r"[\"\'\#\/](((aHR0c)|(ZnRw))[a-zA-Z0-9]+)")
 base64_value_pattern = re.compile(r"^[A-Za-z0-9+/\-_]+=*$")
 
+# A maximal run of base64-alphabet characters within a path segment or query
+# value. Phishing kits routinely glue the base64 token to other text with a
+# separator outside the base64 alphabet (e.g. /py4h4jowd8lf$aHJj... or a bare
+# /$aHJj...), so the decoders scan for runs rather than requiring the whole
+# segment to be base64.
+base64_token_pattern = re.compile(r"[A-Za-z0-9+/\-_]+=*")
+
 # Used to decide whether a decoded base64 token (from a URL path segment or a
 # query parameter) is worth surfacing as a child URL. Decoding every
 # base64-looking token would emit an observable for benign tracking ids; we only
@@ -61,6 +68,23 @@ def decode_base64_ioc(value: str, domain_as_url: bool = False) -> str:
         return decoded
 
     return ""
+
+
+def iter_base64_ioc_tokens(text: str, domain_as_url: bool = False) -> List[tuple]:
+    """Return (token, decoded) pairs for each base64-alphabet run in text whose
+    decoded value carries an IOC per decode_base64_ioc. A fully-base64 text
+    yields itself as the single token, so this is a strict superset of handing
+    the whole text to decode_base64_ioc. Shared by get_base64_param_urls and
+    get_base64_path_urls so the query and path decoders stay in lockstep.
+    """
+    tokens = []
+    for match in base64_token_pattern.finditer(text):
+        token = match.group(0)
+        decoded = decode_base64_ioc(token, domain_as_url=domain_as_url)
+        if decoded:
+            tokens.append((token, decoded))
+
+    return tokens
 
 
 # TODO: Change this to inherit from a set
@@ -596,23 +620,20 @@ class URL:
 
         for key, values in self.query_dict.items():
             for value in values:
-                decoded = decode_base64_ioc(value, domain_as_url=domain_as_url)
-                if not decoded:
-                    continue
+                for token, decoded in iter_base64_ioc_tokens(value, domain_as_url=domain_as_url):
+                    new_query = query_string.replace(token, decoded, 1)
+                    new_url = f"{self.split_value.scheme}://{self.split_value.netloc}{self.split_value.path}?{new_query}"
+                    if self.split_value.fragment:
+                        new_url += f"#{self.split_value.fragment}"
 
-                new_query = query_string.replace(value, decoded, 1)
-                new_url = f"{self.split_value.scheme}://{self.split_value.netloc}{self.split_value.path}?{new_query}"
-                if self.split_value.fragment:
-                    new_url += f"#{self.split_value.fragment}"
-
-                urls.add(new_url)
+                    urls.add(new_url)
 
         return urls
 
     def get_base64_path_urls(self, domain_as_url: bool = False) -> Set[str]:
-        """Decode base64 path segments and substitute the decoded value back into
-        the URL when it carries an email address or an embedded URL (or a bare
-        domain when ``domain_as_url`` is set).
+        """Decode base64 tokens found in path segments and substitute the decoded
+        value back into the URL when it carries an email address or an embedded
+        URL (or a bare domain when ``domain_as_url`` is set).
 
         This complements get_base64_values, which only recognizes a path segment
         that is itself a base64-encoded URL (it decodes strictly starting with
@@ -629,18 +650,15 @@ class URL:
             return urls
 
         for segment in path.split("/"):
-            decoded = decode_base64_ioc(segment, domain_as_url=domain_as_url)
-            if not decoded:
-                continue
+            for token, decoded in iter_base64_ioc_tokens(segment, domain_as_url=domain_as_url):
+                new_path = path.replace(token, decoded, 1)
+                new_url = f"{self.split_value.scheme}://{self.split_value.netloc}{new_path}"
+                if self.split_value.query:
+                    new_url += f"?{self.split_value.query}"
+                if self.split_value.fragment:
+                    new_url += f"#{self.split_value.fragment}"
 
-            new_path = path.replace(segment, decoded, 1)
-            new_url = f"{self.split_value.scheme}://{self.split_value.netloc}{new_path}"
-            if self.split_value.query:
-                new_url += f"?{self.split_value.query}"
-            if self.split_value.fragment:
-                new_url += f"#{self.split_value.fragment}"
-
-            urls.add(new_url)
+                urls.add(new_url)
 
         return urls
 
