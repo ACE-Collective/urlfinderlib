@@ -275,6 +275,11 @@ def test_url_decode_base64_query_params():
     assert url.get_base64_param_urls() == set()
     assert "https://www.domain.com/?p=evil.com" in url.get_base64_param_urls(domain_as_url=True)
 
+    # a base64 token glued to other text with a non-base64 separator is still
+    # found -- only the token is replaced, the surrounding text is preserved
+    url = URL("https://www.domain.com/?p=abc123xyz$dXNlckBleGFtcGxlLmNvbQ==")
+    assert "https://www.domain.com/?p=abc123xyz$user@example.com" in url.get_base64_param_urls()
+
 
 def test_url_decode_base64_path_segments():
     # base64-encoded email in a path segment (targeted-phishing pattern)
@@ -311,6 +316,15 @@ def test_url_decode_base64_path_segments():
     url = URL("https://www.domain.com/ZXZpbC5jb20=")
     assert url.get_base64_path_urls() == set()
     assert "https://www.domain.com/evil.com" in url.get_base64_path_urls(domain_as_url=True)
+
+    # a token glued to a non-base64 separator is still found: kits encode the
+    # victim's email behind a "$", bare or with a random prefix
+    url = URL("https://www.domain.com/$dXNlckBleGFtcGxlLmNvbQ==")
+    assert "https://www.domain.com/$user@example.com" in url.get_base64_path_urls()
+    assert "https://www.domain.com/$user@example.com" in {str(u) for u in url.child_urls}
+
+    url = URL("https://www.domain.com/py4h4jowd8lf$dXNlckBleGFtcGxlLmNvbQ==")
+    assert "https://www.domain.com/py4h4jowd8lf$user@example.com" in url.get_base64_path_urls()
 
 
 def test_url_decode_google_redirect():
