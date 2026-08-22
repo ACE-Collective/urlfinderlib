@@ -20,7 +20,6 @@ import urlfinderlib.helpers as helpers
 # If these were not at the beginning of the regex statement, we would find additional URLs, but they
 # are often malformed when decoded, as they are buried inside of a larger URL encoding scheme.
 base64_pattern = re.compile(r"[\"\'\#\/](((aHR0c)|(ZnRw))[a-zA-Z0-9]+)")
-base64_value_pattern = re.compile(r"^[A-Za-z0-9+/\-_]+=*$")
 
 # A maximal run of base64-alphabet characters within a path segment or query
 # value. Phishing kits routinely glue the base64 token to other text with a
@@ -44,17 +43,15 @@ def decode_base64_ioc(value: str, domain_as_url: bool = False) -> str:
     something worth surfacing as a child URL: an email address or an embedded
     http/ftp URL, or -- when ``domain_as_url`` is set -- a bare domain.
 
-    Returns "" to skip the token (too short, not base64, a no-op decode, or
-    IOC-free content such as a tracking id or opaque state token). Shared by
-    get_base64_param_urls and get_base64_path_urls so the query and path
-    decoders stay in lockstep. ``domain_as_url`` mirrors the flag on find_urls:
-    off by default because a base64 blob decoding to a bare domain is a weaker
-    signal than an email or a full URL and is more prone to coincidence.
+    Returns "" to skip the token (too short, not decodable, a no-op decode, or
+    IOC-free content such as a tracking id or opaque state token). Callers hand
+    in base64-alphabet runs extracted by iter_base64_ioc_tokens; anything else
+    falls out at the decode step, which returns "" on failure. ``domain_as_url``
+    mirrors the flag on find_urls: off by default because a base64 blob decoding
+    to a bare domain is a weaker signal than an email or a full URL and is more
+    prone to coincidence.
     """
     if len(value) < 8:
-        return ""
-
-    if not base64_value_pattern.match(value):
         return ""
 
     decoded = helpers.decode_base64_ascii(value)
