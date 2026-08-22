@@ -619,7 +619,9 @@ class URL:
             for value in values:
                 for token, decoded in iter_base64_ioc_tokens(value, domain_as_url=domain_as_url):
                     new_query = query_string.replace(token, decoded, 1)
-                    new_url = f"{self.split_value.scheme}://{self.split_value.netloc}{self.split_value.path}?{new_query}"
+                    new_url = (
+                        f"{self.split_value.scheme}://{self.split_value.netloc}{self.split_value.path}?{new_query}"
+                    )
                     if self.split_value.fragment:
                         new_url += f"#{self.split_value.fragment}"
 
