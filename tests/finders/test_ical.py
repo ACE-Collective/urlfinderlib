@@ -82,3 +82,36 @@ def test_non_text_properties_do_not_crash():
         "END:VCALENDAR\r\n"
     )
     assert finders.IcalUrlFinder(ical).find_urls() == set()
+
+
+def test_malformed_lines_do_not_discard_calendar():
+    """Regression: junk lines the strict parser rejects (a parameter with no '=') must not throw away
+    the URLs in the rest of the calendar."""
+    ical = (
+        "BEGIN:VCALENDAR\r\n"
+        "X-STAGE; MENTION: bcf985f545ec4437d49a4a6eda9bc56b52ec47625830e6f0efabd405831990e8\r\n"
+        "VERSION:2.0\r\n"
+        "PRODID:-//Test//Test//EN\r\n"
+        "BEGIN:VEVENT\r\n"
+        "X-AGENT; RATE: 7f6aa1754cd43b042803928264301003128f8029ae10f454af47846a0317b9f3\r\n"
+        "UID:uid@example.com\r\n"
+        "DTSTAMP:20260101T000000Z\r\n"
+        "DESCRIPTION:see https://example.com/desc for details\r\n"
+        'X-ALT-DESC;FMTTYPE=text/html:<p><a href="https://example.com/x/index.php">Review</a></p>\r\n'
+        "END:VEVENT\r\n"
+        "END:VCALENDAR\r\n"
+    )
+    assert finders.IcalUrlFinder(ical).find_urls() == {
+        "https://example.com/desc",
+        "https://example.com/x/index.php",
+    }
+
+
+def test_url_in_malformed_line():
+    ical = _calendar("X-NOTE; EXTRA: visit https://example.com/junk now\r\n")
+    assert finders.IcalUrlFinder(ical).find_urls() == {"https://example.com/junk"}
+
+
+def test_lines_after_end_do_not_discard_calendar():
+    ical = _calendar("LOCATION:https://example.com/loc\r\n") + "UID:20210115T101010/27346262376@abc.de\r\n"
+    assert finders.IcalUrlFinder(ical).find_urls() == {"https://example.com/loc"}
