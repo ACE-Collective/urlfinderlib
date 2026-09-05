@@ -96,3 +96,43 @@ def test_trailing_punctuation_stripped():
     urls = finder.find_urls()
     assert "http://domain.com/path" in urls
     assert "http://domain.com/path," not in urls
+
+
+def test_url_at_start_of_line_does_not_absorb_prose():
+    text = b"https://domain.com/path/ It was a pleasure. Have a great day! Regards"
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    assert finder.find_urls() == {"https://domain.com/path"}
+
+
+def test_url_at_start_of_line_with_non_breaking_spaces_does_not_absorb_prose():
+    text = " \xa0 https://domain.com/path/ \xa0 It was a pleasure. Have a great day! \xa0 Regards".encode("utf-8")
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    assert finder.find_urls() == {"https://domain.com/path"}
+
+
+def test_delimited_url_keeps_literal_spaces():
+    text = b'"http://domain.com/about us/index.php"'
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    assert finder.find_urls() == {"http://domain.com/about us/index.php", "http://domain.com/about"}
+
+    text = b"<http://domain.com/about us/index.php>"
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    assert finder.find_urls() == {"http://domain.com/about us/index.php", "http://domain.com/about"}
+
+
+def test_undelimited_url_stops_at_whitespace():
+    text = b"http://domain.com/about us/index.php"
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    assert finder.find_urls() == {"http://domain.com/about"}
+
+
+def test_url_as_whole_sentence_drops_trailing_period():
+    text = b"https://domain.com/path/x. Next sentence"
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    assert finder.find_urls() == {"https://domain.com/path/x", "https://domain.com/path/x."}
+
+
+def test_unbalanced_bracket_in_netloc_without_whitespace():
+    text = b"http://[domain.com/path"
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    assert finder.find_urls() == {"https://domain.com/path"}

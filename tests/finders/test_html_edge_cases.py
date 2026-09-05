@@ -253,3 +253,12 @@ def test_xml_encoding_declaration_via_find_urls():
     plain XML, and only the HTML route reaches the lxml parse this test guards.
     """
     assert urlfinderlib.find_urls(xhtml_with_encoding_declaration, mimetype="text/html") == xhtml_expected_urls
+
+
+def test_visible_text_url_at_start_of_line_does_not_absorb_prose():
+    html = (
+        b"<html><body><p>&nbsp; https://domain.com/path/ &nbsp; It was a pleasure. "
+        b"Have a great day! &nbsp; Regards</p></body></html>"
+    )
+    finder = urlfinderlib.finders.HtmlUrlFinder(html)
+    assert finder.find_urls() == {"https://domain.com/path"}
