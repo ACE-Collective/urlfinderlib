@@ -1,3 +1,4 @@
+import re
 from itertools import chain
 from typing import Set, Union
 
@@ -6,6 +7,10 @@ import validators
 import urlfinderlib.helpers as helpers
 import urlfinderlib.tokenizer as tokenizer
 from urlfinderlib.url import URLList
+
+
+def _has_internal_whitespace(token: str) -> bool:
+    return re.search(r"\s", token.strip()) is not None
 
 
 class TextUrlFinder:
@@ -18,8 +23,15 @@ class TextUrlFinder:
     def find_urls(self, strict: bool = True, domain_as_url: bool = False) -> Set[str]:
         tok = tokenizer.UTF8Tokenizer(self.blob)
 
+        # Whitespace terminates a URL in free-running text. A URL may carry literal spaces only when it is
+        # delimited (quotes, brackets, angle brackets), because there the delimiters say where it ends. A
+        # whole line or sentence that starts with a URL and runs on into prose would otherwise validate,
+        # since the path is percent-encoded before validation, and the prose would be stored as the URL.
+        free_text_token_iter = (
+            token for token in chain(tok.get_line_tokens(), tok.get_sentences()) if not _has_internal_whitespace(token)
+        )
+
         token_iter = chain(
-            tok.get_line_tokens(),
             tok.get_tokens_between_angle_brackets(strict=strict),
             tok.get_tokens_between_backticks(),
             tok.get_tokens_between_brackets(strict=strict),
@@ -27,7 +39,7 @@ class TextUrlFinder:
             tok.get_tokens_between_double_quotes(),
             tok.get_tokens_between_parentheses(strict=strict),
             tok.get_tokens_between_single_quotes(),
-            tok.get_sentences(),
+            free_text_token_iter,
         )
 
         split_token_iter = tok.get_split_tokens_after_replace(
