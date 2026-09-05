@@ -130,3 +130,9 @@ def test_url_as_whole_sentence_drops_trailing_period():
     text = b"https://domain.com/path/x. Next sentence"
     finder = urlfinderlib.finders.TextUrlFinder(text)
     assert finder.find_urls() == {"https://domain.com/path/x", "https://domain.com/path/x."}
+
+
+def test_unbalanced_bracket_in_netloc_without_whitespace():
+    text = b"http://[domain.com/path"
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    assert finder.find_urls() == {"https://domain.com/path"}

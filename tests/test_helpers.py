@@ -45,6 +45,10 @@ def test_prepend_missing_scheme_value_error():
     assert helpers.prepend_missing_scheme("http://dom[ain.com") == "http://dom[ain.com"
 
 
+def test_fix_scheme_value_error():
+    assert helpers.fix_scheme("http://dom[ain.com") == ""
+
+
 def test_remove_mailto_if_not_email_address():
     assert helpers.remove_mailto_if_not_email_address("mailto:http://domain.com") == "http://domain.com"
     assert helpers.remove_mailto_if_not_email_address("mailto:user@domain.com") == "mailto:user@domain.com"
