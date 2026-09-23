@@ -1,4 +1,5 @@
 import re
+from bisect import bisect_right
 from itertools import chain
 from typing import Iterator, List, Union
 
@@ -46,23 +47,20 @@ class UTF8Tokenizer:
     def get_tokens_between_open_and_close_sequence(
         self, open_sequence: str, close_sequence: str, strict: bool = True
     ) -> Iterator[str]:
+        # Each opening sequence pairs with the first closing sequence after it (strict), or with every
+        # closing sequence after it. Both index lists are sorted, so a binary search finds the first
+        # one; scanning the list from the start for every opening sequence is quadratic.
         open_indices = self._get_indices_of_sequence(open_sequence)
         closed_indices = self._get_indices_of_sequence(close_sequence)
 
         index_pairs = []
-        for open_index, open_value in enumerate(open_indices):
-            for closed_value in closed_indices[:]:
-                if open_value < closed_value:
-                    index_pairs.append((open_value, closed_value))
-
-                    try:
-                        if closed_value < open_indices[open_index + 1]:
-                            closed_indices.remove(closed_value)
-                    except IndexError:
-                        pass
-
-                    if strict:
-                        break
+        for open_value in open_indices:
+            first = bisect_right(closed_indices, open_value)
+            if strict:
+                if first < len(closed_indices):
+                    index_pairs.append((open_value, closed_indices[first]))
+            else:
+                index_pairs.extend((open_value, closed_value) for closed_value in closed_indices[first:])
 
         return (self.utf8_string[o + 1 : c] for o, c in index_pairs)
 

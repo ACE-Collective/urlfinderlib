@@ -544,6 +544,24 @@ def test_urllist_get_all_urls_domain_as_url_threads_to_base64():
     assert "https://www.domain.com/evil.com" in urllist.get_all_urls(domain_as_url=True)
 
 
+def test_urllist_get_all_urls_terminates_on_self_child():
+    # A tracking link whose base64 param has percent-encoded padding is
+    # returned as its own child; get_all_urls used to never empty its worklist.
+    url = "http://www.domain.com/email-settings/out/?uid=dXNlckBleGFtcGxlLmNvbQ%3D%3D&l=1&cid=1001"
+    assert URLList([URL(url)]).get_all_urls() == {url}
+
+
+def test_urllist_get_all_urls_terminates_on_cycle(monkeypatch):
+    # Independent of any one decoder: whatever produces a cycle, each value is
+    # expanded once and the worklist empties.
+    a, b = "http://a.domain.com/x", "http://b.domain.com/y"
+    children = {a: [b, a], b: [a]}
+    monkeypatch.setattr(
+        URL, "get_child_urls", lambda self, domain_as_url=False: URLList([URL(v) for v in children[self.value]])
+    )
+    assert URLList([URL(a), URL(a), URL(b)]).get_all_urls() == {a, b}
+
+
 def test_urllist_get_all_urls_empty():
     urllist = URLList([])
     assert len(urllist) == 0
