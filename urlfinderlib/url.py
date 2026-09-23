@@ -106,15 +106,21 @@ class URLList(UserList):
 
     def get_all_urls(self, domain_as_url: bool = False) -> Set[str]:
         if self.data:
-            all_urls = []
+            # A URL can produce a child that has already been expanded, itself included, so each
+            # value is expanded only once. Without this the worklist never empties on a cycle.
+            all_urls = set()
             stack = self.data[:]
             while stack:
                 url = stack.pop()
-                all_urls.append(url.value)
-                for child_url in url.get_child_urls(domain_as_url=domain_as_url):
-                    stack.append(child_url)
+                if url.value in all_urls:
+                    continue
 
-            return set(all_urls)
+                all_urls.add(url.value)
+                for child_url in url.get_child_urls(domain_as_url=domain_as_url):
+                    if child_url.value not in all_urls:
+                        stack.append(child_url)
+
+            return all_urls
 
         return set()
 
@@ -690,7 +696,7 @@ class URL:
         if self.is_proofpoint_v3:
             child_urls.append(self.decode_proofpoint_v3())
 
-        return URLList([URL(u) for u in child_urls])
+        return URLList([URL(u) for u in child_urls if u and u != self.value])
 
     def get_fragment_urls(self) -> Set[str]:
         return {v for v in self.get_fragment_values() if URL(v).is_url}
