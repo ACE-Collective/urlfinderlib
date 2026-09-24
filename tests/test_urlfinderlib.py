@@ -1,7 +1,14 @@
 import os
+import random
+import re
+import string
+import time
+
+import pytest
 
 import urlfinderlib
 from urlfinderlib.helpers import might_be_html
+from urlfinderlib.tokenizer import UTF8Tokenizer
 from urlfinderlib.urlfinderlib import (
     _has_u_escaped_lowercase_bytes,
     _has_u_escaped_uppercase_bytes,
@@ -292,3 +299,36 @@ def test_find_urls_in_text_does_not_build_a_tree():
 
     assert urlfinderlib.find_urls(blob) == {"https://domain.com", "https://domain.com/index.php"}
     assert urlfinderlib.find_urls_in_text(blob) == {"https://domain.com"}
+
+
+def _reference_get_sentences(self):
+    # The original UTF8Tokenizer.get_sentences, quadratic on a long line with no sentence terminator.
+    return (x.group(1) for x in re.finditer(r"(.*?)[.!?]\s", self.utf8_string))
+
+
+@pytest.mark.parametrize("name", sorted(os.listdir(files_dir)))
+def test_find_urls_unchanged_by_linear_get_sentences(name, monkeypatch):
+    with open(f"{files_dir}/{name}", "rb") as f:
+        blob = f.read()
+
+    after = urlfinderlib.find_urls(blob)
+    monkeypatch.setattr(UTF8Tokenizer, "get_sentences", _reference_get_sentences)
+    before = urlfinderlib.find_urls(blob)
+
+    assert after == before
+
+
+def test_find_urls_minified_javascript_is_linear():
+    # A multi-line license header keeps _is_maybe_csv from routing the blob away from the text finder, as it
+    # does with any single-line blob. The quadratic get_sentences took ~8 s on a 30 KB line; this is 250 KB.
+    rng = random.Random(0)
+    parts = []
+    length = 0
+    while length < 250_000:
+        parts.append("".join(rng.choice(string.ascii_letters) for _ in range(rng.randint(1, 8))) + rng.choice(".();,"))
+        length += len(parts[-1])
+    blob = "/*!\n * Example v1.0.0 (https://example.com/)\n * Licensed under MIT\n */\n" + "".join(parts)
+
+    start = time.perf_counter()
+    urlfinderlib.find_urls(blob, mimetype="text/plain")
+    assert time.perf_counter() - start < 2
