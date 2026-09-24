@@ -3,6 +3,8 @@ from bisect import bisect_right
 from itertools import chain
 from typing import Iterator, List, Union
 
+_SENTENCE_TERMINATOR = re.compile(r"[.!?]\s")
+
 
 class UTF8Tokenizer:
     def __init__(self, blob: Union[bytes, str]):
@@ -27,7 +29,17 @@ class UTF8Tokenizer:
         return (x.group(0).decode("ascii") for x in re.finditer(pattern, self.blob))
 
     def get_sentences(self) -> Iterator[str]:
-        return (x.group(1) for x in re.finditer(r"(.*?)[.!?]\s", self.utf8_string))
+        # Same output as re.finditer(r"(.*?)[.!?]\s", s), whose lazy prefix retries from every position of a
+        # line with no terminator and so is quadratic in the line length (minified JavaScript). A sentence runs
+        # from the end of the previous terminator, or from just after the last newline before this terminator
+        # if one comes later, since "." matches anything but a newline.
+        s = self.utf8_string
+        pos = 0
+        for match in _SENTENCE_TERMINATOR.finditer(s):
+            end = match.start()
+            newline = s.rfind("\n", pos, end)
+            yield s[newline + 1 if newline >= pos else pos : end]
+            pos = match.end()
 
     def get_tokens_between_angle_brackets(self, strict: bool = True) -> Iterator[str]:
         return self.get_tokens_between_open_and_close_sequence("<", ">", strict=strict)

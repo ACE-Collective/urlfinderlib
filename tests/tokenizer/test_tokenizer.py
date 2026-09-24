@@ -1,3 +1,8 @@
+import random
+import re
+import string
+import time
+
 import pytest
 
 from urlfinderlib.tokenizer import UTF8Tokenizer
@@ -188,3 +193,58 @@ def test_non_utf8():
     expected = ["This", "is", "a", "simple\x00", "test."]
     results = tok.get_split_tokens()
     assert sorted(results) == sorted(expected)
+
+
+def _reference_get_sentences(s: str) -> list:
+    # The original implementation, kept as the oracle: correct, but quadratic on a long line with no terminator.
+    return [x.group(1) for x in re.finditer(r"(.*?)[.!?]\s", s)]
+
+
+def _minified_js_line(size: int) -> str:
+    # One line shaped like minified JavaScript: plenty of "." but never followed by whitespace.
+    rng = random.Random(0)
+    parts = []
+    length = 0
+    while length < size:
+        parts.append("".join(rng.choice(string.ascii_letters) for _ in range(rng.randint(1, 8))) + rng.choice(".();,"))
+        length += len(parts[-1])
+    return "".join(parts)
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("", []),
+        ("no terminator here", []),
+        ("no terminator at the end.", []),
+        ("First. Second! Third? Fourth", ["First", "Second", "Third"]),
+        ("a\rb. ", ["a\rb"]),
+        ("abc.\nxyz. ", ["abc", "xyz"]),
+        ("a.. b", ["a."]),
+        (". x", [""]),
+        ("a.\n. b", ["a", ""]),
+        ("line one\nline two. rest", ["line two"]),
+        ("one\ntwo\nthree. four\nfive! ", ["three", "five"]),
+        ("a.\u00a0b.\u2003", ["a", "b"]),
+        ("see http://example.com/a.\tnext", ["see http://example.com/a"]),
+    ],
+)
+def test_get_sentences(text, expected):
+    assert list(UTF8Tokenizer(text).get_sentences()) == expected
+    assert _reference_get_sentences(text) == expected
+
+
+def test_get_sentences_matches_reference_on_random_text():
+    rng = random.Random(20260924)
+    alphabet = string.ascii_letters + " .!?\n\r\t,/:"
+    for _ in range(20_000):
+        text = "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 200)))
+        assert list(UTF8Tokenizer(text).get_sentences()) == _reference_get_sentences(text), repr(text)
+
+
+def test_get_sentences_is_linear_on_minified_javascript():
+    # The quadratic implementation took ~8 s on 30 KB; this is 250 KB.
+    body = _minified_js_line(250_000)
+    start = time.perf_counter()
+    assert list(UTF8Tokenizer(body).get_sentences()) == []
+    assert time.perf_counter() - start < 2
