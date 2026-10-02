@@ -120,8 +120,14 @@ def remove_hidden_unicode_characters(value: str) -> str:
 
 
 def remove_surrounding_quotes(value: str) -> str:
-    if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
-        return value[1:-1]
+    # A value that opens with a quote is a string literal, and a string literal ends at its first closing
+    # quote. A token cut between other delimiters can run past it: the text between the parentheses of
+    # `open("https://domain.com/?id=" + id + "&x=1")` opens and closes with a quote but holds two literals,
+    # and stripping only the outer pair would report the code between them as part of the URL.
+    if value[:1] in ('"', "'"):
+        end = value.find(value[0], 1)
+        if end != -1:
+            return value[1:end]
 
     return value
 

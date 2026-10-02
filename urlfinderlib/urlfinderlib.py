@@ -9,6 +9,23 @@ import urlfinderlib.finders as finders
 import urlfinderlib.helpers as helpers
 from urlfinderlib.url import URL, URLList
 
+# A whole URL stored base64-encoded: a run of base64-alphabet characters (standard or URL-safe) that opens
+# with the encoding of "http" or "ftp". Phishing kits park the redirect target this way in an attribute
+# (`<a href="aHR0cHM6Ly9...">`) or a string literal and decode it with atob() at runtime, so the URL never
+# appears in the file as text. The lookbehind anchors the run at a non-base64 character, which keeps the
+# match aligned on a 4-character group boundary: a match that starts mid-run would decode to garbage.
+base64_encoded_url_pattern = re.compile(r"(?<![A-Za-z0-9+/_-])(?:aHR0c|ZnRw)[A-Za-z0-9+/_-]+={0,2}")
+
+
+def _find_base64_encoded_urls(blob: bytes) -> Set[str]:
+    urls = set()
+    for match in base64_encoded_url_pattern.finditer(blob.decode("utf-8", errors="ignore")):
+        decoded = helpers.decode_base64_ascii(match.group(0))
+        if decoded:
+            urls |= finders.TextUrlFinder(decoded).find_urls(strict=True)
+
+    return urls
+
 
 def _remove_utf16_chars(blob: bytes) -> bytes:
     blob = blob.lstrip(codecs.BOM_UTF16)
@@ -58,6 +75,8 @@ def find_urls(blob: Union[bytes, str], base_url: str = "", mimetype: str = "", d
     else:
         urls += finders.DataUrlFinder(blob).find_urls()
 
+    urls += _find_base64_encoded_urls(blob)
+
     return URLList([URL(u) for u in urls]).get_all_urls(domain_as_url=domain_as_url)
 
 
@@ -74,6 +93,7 @@ def find_urls_in_text(blob: Union[bytes, str], domain_as_url: bool = False) -> S
         blob = blob.encode("utf-8", errors="ignore")
 
     urls = finders.TextUrlFinder(blob).find_urls(strict=True, domain_as_url=domain_as_url)
+    urls |= _find_base64_encoded_urls(blob)
     return URLList([URL(u) for u in urls]).get_all_urls(domain_as_url=domain_as_url)
 
 

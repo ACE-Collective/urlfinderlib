@@ -1,3 +1,4 @@
+import base64
 import os
 import random
 import re
@@ -332,3 +333,58 @@ def test_find_urls_minified_javascript_is_linear():
     start = time.perf_counter()
     urlfinderlib.find_urls(blob, mimetype="text/plain")
     assert time.perf_counter() - start < 2
+
+
+def _b64(value: str) -> str:
+    return base64.b64encode(value.encode()).decode()
+
+
+def test_find_urls_base64_encoded_url_in_svg_attribute():
+    # The script the SVG loads decodes the href with atob() and navigates to it, so the URL is never in the
+    # file as text. The XML finder only looks at attribute values containing "." and "/", which base64 lacks.
+    encoded = _b64("https://redirect.example.com/url?q=https%3A%2F%2Fdomain.com%2Flanding#tracking=")
+    blob = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">\n'
+        f'<a id="lnk" href="{encoded}" data-s="{_b64("user@example.com")}"><rect width="800"/></a>\n'
+        '<script type="text/javascript" xlink:href="https://domain.com/rd.js"/>\n'
+        "</svg>\n"
+    ).encode()
+
+    assert urlfinderlib.find_urls(blob) == {
+        "http://www.w3.org/2000/svg",
+        "http://www.w3.org/1999/xlink",
+        "https://domain.com/rd.js",
+        "https://redirect.example.com/url?q=https%3A%2F%2Fdomain.com%2Flanding#tracking=",
+        "https://domain.com/landing",
+    }
+
+
+def test_find_urls_base64_encoded_url_in_text():
+    assert urlfinderlib.find_urls(f'var u = atob("{_b64("https://domain.com/path")}");', mimetype="text/plain") == {
+        "https://domain.com/path"
+    }
+    assert urlfinderlib.find_urls_in_text(f"go to {_b64('ftp://domain.com/file')} now") == {"ftp://domain.com/file"}
+
+
+def test_find_urls_base64_encoded_url_urlsafe_alphabet():
+    encoded = base64.urlsafe_b64encode(b"https://domain.com/~~~/x").decode()
+    assert "-" in encoded or "_" in encoded
+
+    assert urlfinderlib.find_urls(f"href={encoded}", mimetype="text/plain") == {"https://domain.com/~~~/x"}
+
+
+def test_find_urls_base64_encoded_url_requires_aligned_run():
+    # "aHR0c" in the middle of a longer base64 run is not the start of an encoded value, and the bytes
+    # decoded from that offset are garbage.
+    assert urlfinderlib.find_urls(f"x{_b64('https://domain.com/path')}", mimetype="text/plain") == set()
+
+
+def test_find_urls_base64_encoded_text_that_is_not_a_url():
+    assert urlfinderlib.find_urls(_b64("http is a protocol"), mimetype="text/plain") == set()
+
+
+def test_find_urls_string_concatenation_stops_at_closing_quote():
+    blob = b'window.open("https://domain.com/?id=" + id + "&x=1");'
+
+    assert urlfinderlib.find_urls(blob, mimetype="text/plain") == {"https://domain.com/?id="}
