@@ -67,6 +67,12 @@ def test_remove_surrounding_quotes():
     assert helpers.remove_surrounding_quotes("'test'") == "test"
 
 
+def test_remove_surrounding_quotes_ends_at_closing_quote():
+    assert helpers.remove_surrounding_quotes('"https://domain.com/?id=" + id + "&x=1"') == "https://domain.com/?id="
+    assert helpers.remove_surrounding_quotes("'https://domain.com/?a=\"b\"'") == 'https://domain.com/?a="b"'
+    assert helpers.remove_surrounding_quotes('"https://domain.com/') == '"https://domain.com/'
+
+
 def test_strip_trailing_punctuation():
     assert helpers.fix_possible_value("domain.com/path,") == "domain.com/path"
     assert helpers.fix_possible_value("domain.com/path;") == "domain.com/path"
