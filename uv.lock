@@ -475,7 +475,7 @@ wheels = [
 
 [[package]]
 name = "urlfinderlib"
-version = "0.25.5"
+version = "0.26.0"
 source = { editable = "." }
 dependencies = [
     { name = "icalendar" },
