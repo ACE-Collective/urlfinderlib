@@ -1,4 +1,5 @@
 import base64
+import json
 import os
 import random
 import re
@@ -245,6 +246,69 @@ def test_find_urls_same_result_in_every_process():
         results.add(proc.stdout.strip())
 
     assert results == {"['http://domain.com/a-&-b']"}
+
+
+def test_find_urls_one_spelling_across_finders():
+    """The HTML finder reads an href with its entities decoded, and the text finder reads it as written."""
+    blob = '<a href="http://domain.com/a-&amp;-b">x</a>'
+    assert urlfinderlib.find_urls(blob, mimetype="text/plain") == {"http://domain.com/a-&-b"}
+
+
+def test_find_urls_json_escaped_slash():
+    blob = json.dumps({"u": "https://domain.com/a/b"}).replace("/", "\\/")
+    assert urlfinderlib.find_urls(blob, mimetype="text/plain") == {"https://domain.com/a/b"}
+
+
+def test_find_urls_json_escape_after_url():
+    blob = json.dumps({"a": "see https://domain.com/a\nThanks", "b": "https://domain.com/b\tnext"})
+    assert urlfinderlib.find_urls(blob) == {"https://domain.com/a", "https://domain.com/b"}
+
+
+def test_find_urls_json_string_holding_html():
+    blob = json.dumps({"html": '<p>E-Mail: user@domain.de</p>\n<a href="https://domain.de/page?a=1&amp;b=2">x</a>'})
+    assert urlfinderlib.find_urls(blob) == {"https://domain.de/page?a=1&b=2"}
+
+
+def test_find_urls_json_string_with_commas_is_one_value():
+    url = "https://fonts.googleapis.com/css?family=Roboto+Mono|Roboto:300,400,400i,500"
+    assert urlfinderlib.find_urls(json.dumps({"href": url})) == {url}
+
+
+def test_find_urls_json_array():
+    blob = json.dumps([{"u": "https://domain.com/a\nnext"}, ["https://domain.com/b", 1, None]])
+    assert urlfinderlib.find_urls(blob) == {"https://domain.com/a", "https://domain.com/b"}
+
+
+def test_find_urls_json_in_a_json_string():
+    blob = json.dumps({"payload": json.dumps({"u": "https://domain.com/x\nnext"})})
+    assert urlfinderlib.find_urls(blob) == {"https://domain.com/x"}
+
+
+def test_find_urls_json_hijacking_prefix():
+    blob = ")]}'\n" + json.dumps({"u": "https://domain.com/x\nnext"})
+    assert urlfinderlib.find_urls(blob, mimetype="text/plain") == {"https://domain.com/x"}
+
+
+def test_find_urls_json_base64_encoded_url_in_a_string():
+    blob = json.dumps({"t": _b64("https://domain.com/path")})
+    assert urlfinderlib.find_urls(blob) == {"https://domain.com/path"}
+
+
+def test_find_urls_json_that_does_not_parse_is_read_as_text():
+    assert urlfinderlib.find_urls('{"u": "https://domain.com/x", broken', mimetype="text/plain") == {
+        "https://domain.com/x"
+    }
+
+
+def test_find_urls_deeply_nested_json_is_read_as_text():
+    # the parser gives up on nesting this deep, and the blob is then text with no URL in it
+    assert urlfinderlib.find_urls("[" * 100_000, mimetype="text/plain") == set()
+
+
+def test_find_urls_backslash_obfuscated_href():
+    blob = b'<a href="https:\\\\domain.com\\redirect\\next">x</a>'
+    assert urlfinderlib.find_urls(blob, mimetype="text/plain") == {"https://domain.com/redirect/next"}
+    assert urlfinderlib.find_urls(blob, mimetype="text/html") == {"https://domain.com/redirect/next"}
 
 
 def test_find_urls_json_with_escaped_html():

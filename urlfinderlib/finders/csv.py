@@ -27,4 +27,4 @@ class CsvUrlFinder:
         for possible_url in possible_urls:
             urls += TextUrlFinder(possible_url).find_urls(strict=True)
 
-        return urls.to_set()
+        return urls.distinct_values()

@@ -8,7 +8,9 @@ import validators
 
 _CIDR_PATTERN = re.compile(r"^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/(\d{1,2})$")
 
-_ASCII_ESCAPE_PATTERN = re.compile(rb"\\(?:u00|x)([0-9A-Fa-f]{2})")
+# \u00XX, \xXX or a JSON \/. Every alternative starts with the backslash so the search can skip ahead to
+# one; a lookbehind on \/ instead made the pattern over 20 times slower on large documents.
+_ASCII_ESCAPE_PATTERN = re.compile(rb"\\(?:(?:u00|x)([0-9A-Fa-f]{2})|/)")
 _PRINTABLE_ASCII = frozenset((string.ascii_letters + string.digits + string.punctuation).encode())
 
 
@@ -119,9 +121,15 @@ def unescape_ascii(blob: bytes) -> bytes:
     Whitespace and control characters stay escaped. A JSON body carrying HTML writes it as
     E-Mail: user@domain.de\\u003C/p\\u003E, and fix_slashes() turns every backslash into a slash, so an
     escape left in place becomes a path segment and the address becomes https://user@domain.de/u003C/p.
+    JSON may also write a slash as \\/, which fix_slashes() would turn into two.
     """
 
     def _decode(match: re.Match) -> bytes:
+        if match.group(1) is None:
+            # \\/ is an escaped backslash followed by a slash, not an escaped slash
+            start = match.start()
+            return match.group(0) if start and match.string[start - 1] == ord("\\") else b"/"
+
         value = int(match.group(1), 16)
         return bytes([value]) if value in _PRINTABLE_ASCII else match.group(0)
 

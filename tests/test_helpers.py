@@ -125,3 +125,9 @@ def test_is_cidr_notation():
     assert helpers._is_cidr_notation("192.168.1.0/index.html") is False
     assert helpers._is_cidr_notation("domain.com/path") is False
     assert helpers._is_cidr_notation("not-cidr") is False
+
+
+def test_unescape_ascii_json_escaped_slash():
+    assert helpers.unescape_ascii(b"https:\\/\\/domain.com\\/a") == b"https://domain.com/a"
+    # an escaped backslash followed by a slash
+    assert helpers.unescape_ascii(b"a\\\\/b") == b"a\\\\/b"

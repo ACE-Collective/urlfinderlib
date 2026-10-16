@@ -54,4 +54,4 @@ class PdfUrlFinder:
         for token in tokens:
             urls += TextUrlFinder(token).find_urls()
 
-        return urls.to_set()
+        return urls.distinct_values()

@@ -98,4 +98,4 @@ class TextUrlFinder:
 
             valid_urls.append(helpers.fix_possible_url(token, domain_as_url=domain_as_url))
 
-        return valid_urls.to_set()
+        return valid_urls.distinct_values()
