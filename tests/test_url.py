@@ -568,13 +568,31 @@ def test_urllist_get_all_urls_empty():
     assert urllist.get_all_urls() == set()
 
 
-def test_urllist_to_set_keeps_the_same_spelling_in_any_order():
+def test_urllist_distinct_values_keeps_the_same_spelling_in_any_order():
     # Spellings of one URL are equal URLs, and a set keeps whichever of them it is given first
     entity, plain = URL("http://domain.com/a-&amp;-b"), URL("http://domain.com/a-&-b")
     encoded, decoded = URL("http://domain.com/a%20b"), URL("http://domain.com/a b")
 
     for urls in ([entity, plain], [plain, entity]):
-        assert {u.value for u in URLList(urls).to_set()} == {"http://domain.com/a-&-b"}
+        assert URLList(urls).distinct_values() == {"http://domain.com/a-&-b"}
 
     for urls in ([encoded, decoded], [decoded, encoded]):
-        assert {u.value for u in URLList(urls).to_set()} == {"http://domain.com/a%20b"}
+        assert URLList(urls).distinct_values() == {"http://domain.com/a%20b"}
+
+
+def test_url_equal_spellings_have_equal_hashes():
+    # a set keeps one of two equal URLs only when their hashes are equal as well
+    pairs = [
+        ("HTTP://DOMAIN.COM/x", "http://domain.com/x"),
+        ("http://faß.de/x", "http://xn--fa-hia.de/x"),
+        ("http://domain.com/a-&amp;-b", "http://domain.com/a-&-b"),
+        ("http://domain.com/a%20b", "http://domain.com/a b"),
+    ]
+    for a, b in pairs:
+        assert URL(a) == URL(b)
+        assert hash(URL(a)) == hash(URL(b))
+        assert len({URL(a), URL(b)}) == 1
+
+
+def test_url_path_case_is_part_of_the_url():
+    assert URL("http://domain.com/Path") != URL("http://domain.com/path")

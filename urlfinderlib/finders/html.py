@@ -57,6 +57,10 @@ class HtmlUrlFinder:
         self._base_url = base_url
 
         utf8_string = helpers.remove_null_characters(blob.decode("utf-8", errors="ignore"))
+
+        # A copy with its entities and percent-encoding decoded is parsed as well. It is the only pass that
+        # finds a URL percent-encoded as written, in an attribute (href="http%3A%2F%2F...") or in text. The
+        # spellings it produces of URLs the first pass also finds are one URL, and find_urls() keeps one.
         decoded_utf8_string = html.unescape(unquote(utf8_string))
 
         self._strings = [utf8_string]
@@ -68,7 +72,7 @@ class HtmlUrlFinder:
         for string in self._strings:
             urls += HtmlTreeUrlFinder(string, base_url=self._base_url).find_urls()
 
-        return urls.to_set()
+        return urls.distinct_values()
 
 
 class HtmlTreeUrlFinder:
@@ -133,7 +137,7 @@ class HtmlTreeUrlFinder:
         for token in token_iter:
             valid_urls.append(token)
 
-        return valid_urls.to_set()
+        return valid_urls.distinct_values()
 
     def _find_document_write_urls(self) -> Set[str]:
         urls = URLList()
@@ -143,7 +147,7 @@ class HtmlTreeUrlFinder:
             new_parser = HtmlUrlFinder(content, base_url=self.base_url)
             urls += new_parser.find_urls()
 
-        return urls.to_set()
+        return urls.distinct_values()
 
     def _find_visible_urls(self) -> Set[str]:
         visible_text = self._get_visible_text()
@@ -153,7 +157,7 @@ class HtmlTreeUrlFinder:
         for possible_url in possible_urls:
             urls += TextUrlFinder(possible_url).find_urls(strict=True)
 
-        return urls.to_set()
+        return urls.distinct_values()
 
     def _get_action_values(self) -> Set[str]:
         values = set()

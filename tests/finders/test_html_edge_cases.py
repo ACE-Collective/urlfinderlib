@@ -55,6 +55,25 @@ def test_encoded_space_before_url():
     assert finder.find_urls() == {"http://domain.com"}
 
 
+def test_backslash_obfuscated_href():
+    # browsers read a backslash as a slash in an http(s) URL; \r and \n here are path characters
+    html = b'<html><body><a href="https:\\\\domain.com\\redirect\\next">x</a></body></html>'
+    finder = urlfinderlib.finders.HtmlUrlFinder(html)
+    assert finder.find_urls() == {"https://domain.com/redirect/next"}
+
+
+def test_percent_encoded_url_in_href():
+    html = b'<html><body><a href="http%3A%2F%2Fdomain.com%2Fpath">x</a></body></html>'
+    finder = urlfinderlib.finders.HtmlUrlFinder(html)
+    assert finder.find_urls() == {"http://domain.com/path"}
+
+
+def test_percent_encoded_url_in_text():
+    html = b"<html><body><p>go to http%3A%2F%2Fdomain.com%2Fpath now</p></body></html>"
+    finder = urlfinderlib.finders.HtmlUrlFinder(html)
+    assert finder.find_urls() == {"http://domain.com/path"}
+
+
 def test_ftp_url():
     html = b'<html><body><a href="ftp://user:pass@domain.com"></a></body></html>'
     finder = urlfinderlib.finders.HtmlUrlFinder(html)

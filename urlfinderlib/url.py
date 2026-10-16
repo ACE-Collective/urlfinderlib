@@ -116,6 +116,15 @@ class URLList(UserList):
             elif value.is_url_ascii:
                 self.data.append(URL(helpers.get_ascii_url(value.value)))
 
+    def extend(self, values) -> None:
+        # the finders return strings, and every value goes through append() so the list only holds URLs
+        for value in values:
+            self.append(value)
+
+    def __iadd__(self, values) -> "URLList":
+        self.extend(values)
+        return self
+
     def get_all_urls(self, domain_as_url: bool = False) -> Set[str]:
         if self.data:
             # A URL can produce a child that has already been expanded, itself included, so each
@@ -136,17 +145,15 @@ class URLList(UserList):
 
         return set()
 
-    def to_set(self) -> Set["URL"]:
-        """Returns the distinct URLs, choosing the same spelling of each URL on every run.
+    def distinct_values(self) -> Set[str]:
+        """Returns one spelling of each distinct URL, the same one on every run.
 
-        URL equality treats spellings of one URL as the same URL (a&amp;b and a&b, a%20b and a b), so a
-        set keeps whichever spelling it is given first. The finders build this list by iterating sets of
-        strings, whose order changes with PYTHONHASHSEED, so the same input gave different URLs in
-        different processes, and find_urls() reported one URL or two depending on whether two finders
-        happened to keep the same spelling. The URLs are added best spelling first, see
-        _spelling_preference().
+        Spellings of one URL are equal URLs (see URL.identity), and a set keeps whichever of them it is
+        given first, so the URLs are added best spelling first (see _spelling_preference()) rather than in
+        the order the list was built, which follows the iteration order of sets of strings and changes
+        with PYTHONHASHSEED.
         """
-        return set(sorted(self.data, key=_spelling_preference))
+        return {url.value for url in set(sorted(self.data, key=_spelling_preference))}
 
     def remove_partial_urls(self) -> "URLList":
         return URLList(
@@ -172,6 +179,7 @@ class URL:
 
         self._child_urls = None
         self._fragment_dict = None
+        self._identity = None
         self._is_mandrillapp = None
         self._is_netloc_ipv4 = None
         self._is_netloc_localhost = None
@@ -207,12 +215,10 @@ class URL:
         elif not isinstance(other, URL):
             return False
 
-        return self.value == other.value or any(
-            other_permutation in self.permutations for other_permutation in other.permutations
-        )
+        return self.identity == other.identity
 
     def __hash__(self) -> int:
-        return hash(html.unescape(unquote(self.value)))
+        return hash(self.identity)
 
     def __lt__(self, other: "URL") -> bool:
         if isinstance(other, URL):
@@ -225,6 +231,21 @@ class URL:
 
     def __str__(self) -> str:
         return self.value
+
+    @property
+    def identity(self) -> str:
+        """The string every spelling of this URL shares, which equality and hashing compare.
+
+        The scheme and the host are case-insensitive, a Unicode host and its IDNA form are one host, and
+        HTML entities and percent-encoding in the path are spellings of the same characters. Comparing a
+        value, rather than asking whether two URLs have a spelling in common, keeps equality transitive
+        and gives equal URLs equal hashes, which a set relies on to keep one of them.
+        """
+        if self._identity is None:
+            netloc = self.netloc_idna or self.netloc_original
+            self._identity = f"{self.split_value.scheme.lower()}://{netloc}{self.path_all_decoded}"
+
+        return self._identity
 
     @property
     def child_urls(self) -> "URLList":

@@ -23,4 +23,4 @@ class DataUrlFinder:
         for possible_url_string in possible_url_strings:
             urls += TextUrlFinder(possible_url_string).find_urls(strict=True)
 
-        return urls.to_set()
+        return urls.distinct_values()
