@@ -84,6 +84,18 @@ def iter_base64_ioc_tokens(text: str, domain_as_url: bool = False) -> List[tuple
     return tokens
 
 
+def _spelling_preference(url: "URL") -> tuple:
+    """Sort key that puts the spelling of a URL to report ahead of the other spellings of it.
+
+    HTML entities are the encoding of the document the URL was found in, and a browser decodes them
+    before it requests the URL, so the spelling without them comes first. Percent-encoding is part of
+    the URL as it was written, and a spelling without it is one the finders decoded themselves (a%20b
+    becomes "a b", a%23b becomes a#b), so the spelling that keeps more of it comes next. The value
+    breaks the remaining ties.
+    """
+    return html.unescape(url.value) != url.value, -url.value.count("%"), url.value
+
+
 # TODO: Change this to inherit from a set
 class URLList(UserList):
     def __eq__(self, other: Union[list, "URLList"]) -> bool:
@@ -123,6 +135,18 @@ class URLList(UserList):
             return all_urls
 
         return set()
+
+    def to_set(self) -> Set["URL"]:
+        """Returns the distinct URLs, choosing the same spelling of each URL on every run.
+
+        URL equality treats spellings of one URL as the same URL (a&amp;b and a&b, a%20b and a b), so a
+        set keeps whichever spelling it is given first. The finders build this list by iterating sets of
+        strings, whose order changes with PYTHONHASHSEED, so the same input gave different URLs in
+        different processes, and find_urls() reported one URL or two depending on whether two finders
+        happened to keep the same spelling. The URLs are added best spelling first, see
+        _spelling_preference().
+        """
+        return set(sorted(self.data, key=_spelling_preference))
 
     def remove_partial_urls(self) -> "URLList":
         return URLList(

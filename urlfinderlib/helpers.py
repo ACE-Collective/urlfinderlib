@@ -1,11 +1,15 @@
 import base64
 import ipaddress
 import re
+import string
 from urllib.parse import urlsplit
 
 import validators
 
 _CIDR_PATTERN = re.compile(r"^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/(\d{1,2})$")
+
+_ASCII_ESCAPE_PATTERN = re.compile(rb"\\(?:u00|x)([0-9A-Fa-f]{2})")
+_PRINTABLE_ASCII = frozenset((string.ascii_letters + string.digits + string.punctuation).encode())
 
 
 def build_url(scheme: str, netloc: str, path: str) -> str:
@@ -107,6 +111,21 @@ def _is_cidr_notation(value: str) -> bool:
         return 0 <= int(match.group(2)) <= 32
     except ValueError:
         return False
+
+
+def unescape_ascii(blob: bytes) -> bytes:
+    """Decodes the \\u00XX and \\xXX escapes JSON and JavaScript strings write printable ASCII as.
+
+    Whitespace and control characters stay escaped. A JSON body carrying HTML writes it as
+    E-Mail: user@domain.de\\u003C/p\\u003E, and fix_slashes() turns every backslash into a slash, so an
+    escape left in place becomes a path segment and the address becomes https://user@domain.de/u003C/p.
+    """
+
+    def _decode(match: re.Match) -> bytes:
+        value = int(match.group(1), 16)
+        return bytes([value]) if value in _PRINTABLE_ASCII else match.group(0)
+
+    return _ASCII_ESCAPE_PATTERN.sub(_decode, blob)
 
 
 def remove_hidden_unicode_characters(value: str) -> str:

@@ -38,4 +38,4 @@ class IcalUrlFinder:
             else:
                 urls += TextUrlFinder(value).find_urls(strict=True)
 
-        return set(urls)
+        return urls.to_set()

@@ -18,7 +18,8 @@ class TextUrlFinder:
         if isinstance(blob, str):
             blob = blob.encode("utf-8", errors="ignore")
 
-        self.blob = blob
+        # every finder hands its candidate strings to this one, so this is where escapes are decoded
+        self.blob = helpers.unescape_ascii(blob)
 
     def find_urls(self, strict: bool = True, domain_as_url: bool = False) -> Set[str]:
         tok = tokenizer.UTF8Tokenizer(self.blob)
@@ -97,4 +98,4 @@ class TextUrlFinder:
 
             valid_urls.append(helpers.fix_possible_url(token, domain_as_url=domain_as_url))
 
-        return set(valid_urls)
+        return valid_urls.to_set()
