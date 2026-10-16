@@ -274,6 +274,11 @@ def test_find_urls_json_string_with_commas_is_one_value():
     assert urlfinderlib.find_urls(json.dumps({"href": url})) == {url}
 
 
+def test_find_urls_json_array():
+    blob = json.dumps([{"u": "https://domain.com/a\nnext"}, ["https://domain.com/b", 1, None]])
+    assert urlfinderlib.find_urls(blob) == {"https://domain.com/a", "https://domain.com/b"}
+
+
 def test_find_urls_json_in_a_json_string():
     blob = json.dumps({"payload": json.dumps({"u": "https://domain.com/x\nnext"})})
     assert urlfinderlib.find_urls(blob) == {"https://domain.com/x"}
