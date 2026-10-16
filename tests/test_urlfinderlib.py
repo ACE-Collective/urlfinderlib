@@ -3,6 +3,8 @@ import os
 import random
 import re
 import string
+import subprocess
+import sys
 import time
 
 import pytest
@@ -10,14 +12,7 @@ import pytest
 import urlfinderlib
 from urlfinderlib.helpers import might_be_html
 from urlfinderlib.tokenizer import UTF8Tokenizer
-from urlfinderlib.urlfinderlib import (
-    _has_u_escaped_lowercase_bytes,
-    _has_u_escaped_uppercase_bytes,
-    _has_x_escaped_lowercase_bytes,
-    _has_x_escaped_uppercase_bytes,
-    _is_maybe_csv,
-    _unescape_ascii,
-)
+from urlfinderlib.urlfinderlib import _is_maybe_csv
 
 this_dir = os.path.dirname(os.path.realpath(__file__))
 files_dir = os.path.realpath(f"{this_dir}/files")
@@ -227,30 +222,6 @@ def test_get_url_permutations():
     assert urlfinderlib.get_url_permutations(url) == expected_permutations
 
 
-def test_has_u_escaped_lowercase_bytes():
-    assert _has_u_escaped_lowercase_bytes(b"This is a test") is False
-    assert _has_u_escaped_lowercase_bytes(b"This is \\u002A a test") is False
-    assert _has_u_escaped_lowercase_bytes(b"This is \\u002a a test") is True
-
-
-def test_has_u_escaped_uppercase_bytes():
-    assert _has_u_escaped_uppercase_bytes(b"This is a test") is False
-    assert _has_u_escaped_uppercase_bytes(b"This is \\u002A a test") is True
-    assert _has_u_escaped_uppercase_bytes(b"This is \\u002a a test") is False
-
-
-def test_has_x_escaped_lowercase_bytes():
-    assert _has_x_escaped_lowercase_bytes(b"This is a test") is False
-    assert _has_x_escaped_lowercase_bytes(b"This is \\x2A a test") is False
-    assert _has_x_escaped_lowercase_bytes(b"This is \\x2a a test") is True
-
-
-def test_has_x_escaped_uppercase_bytes():
-    assert _has_x_escaped_uppercase_bytes(b"This is a test") is False
-    assert _has_x_escaped_uppercase_bytes(b"This is \\x2A a test") is True
-    assert _has_x_escaped_uppercase_bytes(b"This is \\x2a a test") is False
-
-
 def test_is_maybe_csv():
     assert _is_maybe_csv(b"") is False
     assert (
@@ -259,11 +230,30 @@ def test_is_maybe_csv():
     assert _is_maybe_csv(b"test,test,test\ntest2,test2,test2") is True
 
 
-def test_unescape_ascii():
-    assert _unescape_ascii(b"\\x4d") == b"M"
-    assert _unescape_ascii(b"\\x4D") == b"M"
-    assert _unescape_ascii(b"\\u004d") == b"M"
-    assert _unescape_ascii(b"\\u004D") == b"M"
+def test_find_urls_same_result_in_every_process():
+    """The order a set of strings iterates in changes with PYTHONHASHSEED, so each process gets its own.
+
+    That order used to decide which spelling of a URL the finders kept, and so which URLs were reported.
+    """
+    text = '<a href="http://domain.com/a-&amp;-b">x</a> see http://domain.com/a-&amp;-b and http://domain.com/a-&-b'
+    code = "import sys, urlfinderlib; print(sorted(urlfinderlib.find_urls(sys.argv[1], mimetype='text/plain')))"
+
+    results = set()
+    for seed in range(8):
+        env = {**os.environ, "PYTHONHASHSEED": str(seed)}
+        proc = subprocess.run([sys.executable, "-c", code, text], env=env, capture_output=True, text=True, check=True)
+        results.add(proc.stdout.strip())
+
+    assert results == {"['http://domain.com/a-&-b']"}
+
+
+def test_find_urls_json_with_escaped_html():
+    """A one-line JSON body with a comma in it is routed to the CSV finder, which hands each cell to the text finder."""
+    blob = (
+        b'{"html":"\\u003Cp\\u003EE-Mail: user@domain.de\\u003C/p\\u003E\\n\\u003Cp\\u003E\\u003Ca href\\u003D\\"'
+        b'https://domain.de/page\\"\\u003Ewww.domain.de\\u003C/a\\u003E\\u003C/p\\u003E","id":1}'
+    )
+    assert urlfinderlib.find_urls(blob, mimetype="text/plain") == {"https://domain.de/page"}
 
 
 def test_find_urls_in_text_skips_html_sniffing():

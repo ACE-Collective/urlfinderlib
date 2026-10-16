@@ -28,6 +28,23 @@ def test_is_base64_ascii():
     assert helpers.is_base64_ascii("YXNkZgo=") is True
 
 
+def test_unescape_ascii():
+    assert helpers.unescape_ascii(b"\\x4d") == b"M"
+    assert helpers.unescape_ascii(b"\\x4D") == b"M"
+    assert helpers.unescape_ascii(b"\\u004d") == b"M"
+    assert helpers.unescape_ascii(b"\\u004D") == b"M"
+    assert helpers.unescape_ascii(b"\\u003Cp\\u003E") == b"<p>"
+
+
+def test_unescape_ascii_leaves_whitespace_and_non_ascii_escaped():
+    assert helpers.unescape_ascii(b"a\\u0020b\\x0ac\\u00A0d") == b"a\\u0020b\\x0ac\\u00A0d"
+
+
+def test_unescape_ascii_decodes_once():
+    # \ is a backslash, and the escape it spells out is text, not another escape
+    assert helpers.unescape_ascii(b"\\u005Cu003C") == b"\\u003C"
+
+
 def test_might_be_html():
     assert helpers.might_be_html(b'<meta http-equiv="refresh" content="0; URL=https://blah.com/one/two">') is True
     assert helpers.might_be_html(b"https://blah.com/one/two") is False

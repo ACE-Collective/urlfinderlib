@@ -566,3 +566,15 @@ def test_urllist_get_all_urls_empty():
     urllist = URLList([])
     assert len(urllist) == 0
     assert urllist.get_all_urls() == set()
+
+
+def test_urllist_to_set_keeps_the_same_spelling_in_any_order():
+    # Spellings of one URL are equal URLs, and a set keeps whichever of them it is given first
+    entity, plain = URL("http://domain.com/a-&amp;-b"), URL("http://domain.com/a-&-b")
+    encoded, decoded = URL("http://domain.com/a%20b"), URL("http://domain.com/a b")
+
+    for urls in ([entity, plain], [plain, entity]):
+        assert {u.value for u in URLList(urls).to_set()} == {"http://domain.com/a-&-b"}
+
+    for urls in ([encoded, decoded], [decoded, encoded]):
+        assert {u.value for u in URLList(urls).to_set()} == {"http://domain.com/a%20b"}

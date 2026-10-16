@@ -68,7 +68,7 @@ class HtmlUrlFinder:
         for string in self._strings:
             urls += HtmlTreeUrlFinder(string, base_url=self._base_url).find_urls()
 
-        return set(urls)
+        return urls.to_set()
 
 
 class HtmlTreeUrlFinder:
@@ -133,7 +133,7 @@ class HtmlTreeUrlFinder:
         for token in token_iter:
             valid_urls.append(token)
 
-        return set(valid_urls)
+        return valid_urls.to_set()
 
     def _find_document_write_urls(self) -> Set[str]:
         urls = URLList()
@@ -143,7 +143,7 @@ class HtmlTreeUrlFinder:
             new_parser = HtmlUrlFinder(content, base_url=self.base_url)
             urls += new_parser.find_urls()
 
-        return set(urls)
+        return urls.to_set()
 
     def _find_visible_urls(self) -> Set[str]:
         visible_text = self._get_visible_text()
@@ -153,7 +153,7 @@ class HtmlTreeUrlFinder:
         for possible_url in possible_urls:
             urls += TextUrlFinder(possible_url).find_urls(strict=True)
 
-        return set(urls)
+        return urls.to_set()
 
     def _get_action_values(self) -> Set[str]:
         values = set()

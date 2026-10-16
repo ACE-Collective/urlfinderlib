@@ -7,6 +7,24 @@ def test_backslashes():
     assert finder.find_urls() == {"http://domain.com"}
 
 
+def test_escaped_markup_after_email_address():
+    text = b'E-Mail: user@domain.de\\u003C/p\\u003E\\n\\u003Ch3 id\\u003D\\"x\\"\\u003E'
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    assert finder.find_urls() == set()
+
+
+def test_escaped_markup_after_domain():
+    text = b'\\u003Ca href\\u003D\\"mailto:user@domain.de\\"\\u003Ewww.domain.de\\u003C/a\\u003E\\u003Cbr/\\u003E'
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    assert finder.find_urls() == set()
+
+
+def test_escaped_url():
+    text = b'"https:\\u002F\\u002Fdomain.com\\u002Fpath?a=1\\u0026b=2"'
+    finder = urlfinderlib.finders.TextUrlFinder(text)
+    assert finder.find_urls() == {"https://domain.com/path?a=1&b=2"}
+
+
 def test_double_opening_characters():
     text = b"<http://domain.com/<123>"
     finder = urlfinderlib.finders.TextUrlFinder(text)
