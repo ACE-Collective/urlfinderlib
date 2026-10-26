@@ -281,3 +281,47 @@ def test_visible_text_url_at_start_of_line_does_not_absorb_prose():
     )
     finder = urlfinderlib.finders.HtmlUrlFinder(html)
     assert finder.find_urls() == {"https://domain.com/path"}
+
+
+def test_content_after_closing_html_tag():
+    """libxml2 parses what follows the first </html> into a second top-level <html> element, which
+    finding in or serializing the tree does not reach unless it is moved under the first one. Email bodies
+    go on past an </html> with a gateway's appended banner or a reply thread pasted after a template.
+    """
+    html = (
+        b'<html><body><a href="https://domain.com/template">Review</a></body></html>\n'
+        b'<div><a href="https://domain2.com/">domain2.com</a>'
+        b'<img src="https://domain3.com/logo.png">\n<p>https://domain4.com/visible</p></div>'
+    )
+    finder = urlfinderlib.finders.HtmlUrlFinder(html)
+    assert finder.find_urls() == {
+        "https://domain.com/template",
+        "https://domain2.com",
+        "https://domain3.com/logo.png",
+        "https://domain4.com/visible",
+    }
+
+
+def test_document_after_closing_html_tag_via_find_urls():
+    """A whole second document, with its own <html>, <head> and <body>, after the first one's </html>."""
+    html = (
+        b"<!DOCTYPE html><html><head><title>Notice</title></head>"
+        b'<body><a href="https://domain.com/template">Review</a></body></html>\n'
+        b'<html><head><meta name="Generator" content="Microsoft Word 15"></head>'
+        b'<body><a href="https://domain2.com/company/acme">Follow us</a></body></html>'
+    )
+    assert urlfinderlib.find_urls(html) == {"https://domain.com/template", "https://domain2.com/company/acme"}
+
+
+def test_empty_srcset_does_not_hide_other_urls():
+    """An empty srcset candidate is a substring of every URL, so filtering out the URLs that contain a
+    srcset candidate loses every href, src and action value in the document."""
+    html = b'<html><body><a href="https://domain.com/login">x</a><img src="https://domain2.com/a.png" srcset=""></body></html>'
+    finder = urlfinderlib.finders.HtmlUrlFinder(html)
+    assert finder.find_urls() == {"https://domain.com/login", "https://domain2.com/a.png"}
+
+
+def test_relative_srcset_candidate_does_not_hide_other_urls():
+    html = b'<html><body><a href="https://domain.com/a/b">x</a><img srcset="a 1x, b 2x"></body></html>'
+    finder = urlfinderlib.finders.HtmlUrlFinder(html)
+    assert finder.find_urls() == {"https://domain.com/a/b"}

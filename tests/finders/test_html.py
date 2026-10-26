@@ -199,3 +199,8 @@ def test_replace_href_value():
     assert href_values == {"test"}
 
     assert finder.tree_string == '<html><body><a href="">blah</a></body></html>'
+
+
+def test_get_srcset_values_skips_empty_candidates():
+    finder = finders.HtmlTreeUrlFinder('<img srcset="http://domain.com/a.png 1x,, http://domain.com/b.png 2x">')
+    assert finder._get_srcset_values() == {"http://domain.com/a.png", "http://domain.com/b.png"}

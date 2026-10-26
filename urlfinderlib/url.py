@@ -571,17 +571,20 @@ class URL:
 
     def decode_mandrillapp(self) -> str:
         base64_string = self.query_dict["p"][0].replace("_", "/")
-        decoded = base64.b64decode(f"{base64_string}===")
 
+        # The value is whatever the link carries, so any layer of it can fail to decode, be missing or hold
+        # another type. An exception here would escape find_urls() and lose every URL in the document.
         try:
-            outer_json = json.loads(decoded)
-            inner_json = json.loads(outer_json["p"])
-            possible_url = helpers.fix_possible_url(inner_json["url"])
-            return possible_url if URL(possible_url).is_url else ""
-        except json.JSONDecodeError:
+            outer_json = json.loads(base64.b64decode(f"{base64_string}==="))
+            url = json.loads(outer_json["p"])["url"]
+        except (binascii.Error, json.JSONDecodeError, KeyError, TypeError, UnicodeDecodeError):
             return ""
-        except UnicodeDecodeError:
+
+        if not isinstance(url, str):
             return ""
+
+        possible_url = helpers.fix_possible_url(url)
+        return possible_url if URL(possible_url).is_url else ""
 
     def decode_proofpoint_v2(self) -> str:
         maketrans = str.maketrans
@@ -622,18 +625,9 @@ class URL:
                 current_marker += run_length
                 return run
 
-        def substitute_tokens(text, start_pos=0):
-            v3_token_pattern = re.compile(r"\*(\*.)?")
-            match = v3_token_pattern.search(text, start_pos)
-            if match:
-                start = text[start_pos : match.start()]
-                built_string = start
-                token = text[match.start() : match.end()]
-                built_string += replace_token(token)
-                built_string += substitute_tokens(text, match.end())
-                return built_string
-            else:
-                return text[start_pos : len(text)]
+        def substitute_tokens(text):
+            # not one recursion per token: a URL can carry more tokens than the recursion limit
+            return re.sub(r"\*(\*.)?", lambda token_match: replace_token(token_match.group(0)), text)
 
         try:
             match = re.search(r"v3/__(.+?)__;(.*?)!", self.value, re.IGNORECASE)
@@ -652,7 +646,10 @@ class URL:
             decoded_url = substitute_tokens(embedded_url)
             decoded_url = helpers.fix_possible_url(decoded_url)
             return decoded_url if URL(decoded_url).is_url else ""
-        except AttributeError:
+        # The URL is whatever the message carries: it may not be a v3 URL at all (AttributeError), or its
+        # replaced characters may not decode or may not match its tokens. An exception here would escape
+        # find_urls() and lose every URL in the document.
+        except (AttributeError, binascii.Error, IndexError, KeyError, UnicodeDecodeError):
             return ""
 
     def get_base64_urls(self) -> Set[str]:

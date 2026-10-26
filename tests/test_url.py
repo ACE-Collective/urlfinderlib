@@ -1,3 +1,8 @@
+import base64
+import json
+
+import pytest
+
 from urlfinderlib.url import *
 
 valid_urls = [
@@ -349,6 +354,32 @@ def test_url_decode_mandrillapp():
     assert unicode_decode_error_url.decode_mandrillapp() == ""
 
 
+def _mandrillapp(p: str) -> URL:
+    return URL(f"https://mandrillapp.com/track/click/30233568/domain.com?p={p}")
+
+
+def _b64_json(value) -> str:
+    return base64.b64encode(json.dumps(value).encode()).decode()
+
+
+@pytest.mark.parametrize(
+    "p",
+    [
+        "eyJwIjoxfQabc",  # base64 one character past a whole group
+        _b64_json([1, 2]),  # not an object
+        _b64_json({"q": 1}),  # no p
+        _b64_json({"p": 5}),  # p not a string
+        _b64_json({"p": json.dumps({"x": 1})}),  # no url
+        _b64_json({"p": json.dumps(["url"])}),  # inner value not an object
+        _b64_json({"p": json.dumps({"url": 5})}),  # url not a string
+    ],
+)
+def test_url_decode_mandrillapp_malformed(p):
+    url = _mandrillapp(p)
+    assert url.is_mandrillapp is True
+    assert url.decode_mandrillapp() == ""
+
+
 def test_url_decode_outlook_safelink():
     url = URL("https://na01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fdomain.com")
     assert url.child_urls == [URL("http://domain.com")]
@@ -366,6 +397,25 @@ def test_url_decode_proofpoint_v2():
 
     keyerror_url = URL("https://urldefense.proofpoint.com/v2/url")
     assert keyerror_url.decode_proofpoint_v2() == ""
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        # the replaced characters lowercased, as a copy in a title attribute has them: Iw is #, iw is not UTF-8
+        "https://urldefense.com/v3/__https://domain.com/page*anchor__;iw!!asdf!asdf$",
+        # base64 one character past a whole group
+        "https://urldefense.com/v3/__https://domain.com/page*anchor__;Iwxyz!!asdf!asdf$",
+        # more tokens than replaced characters
+        "https://urldefense.com/v3/__https://domain.com/a*b*c__;Iw!!asdf!asdf$",
+        # a run token whose length character is not in the run alphabet
+        "https://urldefense.com/v3/__https://domain.com/a**!b__;Iw!!asdf!asdf$",
+    ],
+)
+def test_url_decode_proofpoint_v3_malformed(value):
+    url = URL(value)
+    assert url.is_proofpoint_v3 is True
+    assert url.decode_proofpoint_v3() == ""
 
 
 def test_url_decode_proofpoint_v3():
@@ -388,6 +438,14 @@ def test_url_decode_proofpoint_v3():
 
     error_url = URL("https://urldefense.com/v3/____;")
     assert error_url.decode_proofpoint_v3() == ""
+
+    # A URL with more tokens than the recursion limit
+    tokens = 1500
+    url = URL(
+        f"https://urldefense.com/v3/__https://domain.com/{'*x' * tokens}__;"
+        f"{base64.urlsafe_b64encode(b'a' * tokens).decode().rstrip('=')}!!asdf!asdf$"
+    )
+    assert url.decode_proofpoint_v3() == f"https://domain.com/{'ax' * tokens}"
 
     # Test a URL that has more than 1 asterisk token
     url = URL(

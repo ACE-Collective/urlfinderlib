@@ -442,3 +442,20 @@ def test_find_urls_string_concatenation_stops_at_closing_quote():
     blob = b'window.open("https://domain.com/?id=" + id + "&x=1");'
 
     assert urlfinderlib.find_urls(blob, mimetype="text/plain") == {"https://domain.com/?id="}
+
+
+def test_find_urls_malformed_redirect_does_not_lose_other_urls():
+    # The title holds the link lowercased, and the lowercased replaced characters (iw) are not UTF-8.
+    blob = (
+        b'<html><body><a href="https://domain.com/login">Sign in</a>'
+        b'<a href="https://urldefense.com/v3/__https://domain2.com/page*anchor__;Iw!!asdf!asdf$" '
+        b'title="https://urldefense.com/v3/__https://domain2.com/page*anchor__;iw!!asdf!asdf$">Read</a>'
+        b"</body></html>"
+    )
+
+    assert urlfinderlib.find_urls(blob) == {
+        "https://domain.com/login",
+        "https://urldefense.com/v3/__https://domain2.com/page*anchor__;Iw!!asdf!asdf$",
+        "https://urldefense.com/v3/__https://domain2.com/page*anchor__;iw!!asdf!asdf$",
+        "https://domain2.com/page#anchor",
+    }
