@@ -27,6 +27,13 @@ def _build_tree(string: str) -> etree.Element:
     if tree.getroot() is None:
         tree = etree.parse(BytesIO(b"<html></html>"), parser=parser)
 
+    # libxml2 puts whatever follows the first </html> into a second top-level <html> element, and finding
+    # in or serializing the tree only covers the first one. Email bodies routinely go on past an </html>: a
+    # banner or disclaimer a gateway appended, or a reply thread pasted after a phishing template.
+    root = tree.getroot()
+    for sibling in list(root.itersiblings()):
+        root.append(sibling)
+
     return tree
 
 
@@ -111,9 +118,7 @@ class HtmlTreeUrlFinder:
         possible_urls = set()
         possible_urls |= {urljoin(self.base_url, u) for u in self._get_base_url_eligible_values()}
 
-        srcset_values = self._get_srcset_values()
-        possible_urls = {u for u in possible_urls if not any(srcset_value in u for srcset_value in srcset_values)}
-        possible_urls |= {urljoin(self._base_url, u) for u in srcset_values}
+        possible_urls |= {urljoin(self._base_url, u) for u in self._get_srcset_values()}
 
         possible_urls |= self._get_tag_attribute_values()
 
@@ -255,7 +260,7 @@ class HtmlTreeUrlFinder:
         for tag in self._tree.iterfind(".//*[@srcset]"):
             value = helpers.fix_possible_url(tag.attrib["srcset"])
             splits = value.split(",")
-            values |= {s.strip().split(" ")[0] for s in splits}
+            values |= {s.strip().split(" ")[0] for s in splits if s.strip()}
 
             tag.attrib["srcset"] = ""
 
